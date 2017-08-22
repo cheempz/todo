@@ -22,7 +22,9 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-	// set up ========================
+    // set up ========================
+    var tv = require('traceview');
+    tv.traceMode = 'always';
 	var express  = require('express');
 	var app      = express(); 								// create our app w/ express
 	var mongoose = require('mongoose'); 					// mongoose for mongodb
@@ -33,7 +35,8 @@
 
 	// configuration =================
 
-	mongoose.connect('mongodb://' + argv.be_ip + ':80/my_database');
+    //mongoose.connect('mongodb://' + argv.be_ip + ':80/my_database');
+    mongoose.connect('mongodb://127.0.0.1:27017/my_database');
 
     	app.use('/js', express.static(__dirname + '/js'));
    	 app.use('/bower_components', express.static(__dirname + '/bower_components'));
@@ -120,8 +123,10 @@
 	// application -------------------------------------------------------------
 	app.get('/', function(req, res) {
 		res.sendfile('index.html'); // load the single view file (angular will handle the page changes on the front-end)
-	});
+    });
+
+    port = 8088;
 
 	// listen (start app with node server.js) ======================================
-	app.listen(8080, argv.fe_ip);
-	console.log("App listening on port 8080");
+	app.listen(port, argv.fe_ip);
+	console.log("App listening on port " + port);
