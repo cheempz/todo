@@ -4,16 +4,16 @@
   "main": "server.js",
   "dependencies": {
     "angular": "1.2.22",
-    "body-parser": "~1.5.2",
+    "todomvc-common": "~0.1.4",
     "express": "~4.7.2",
-    "method-override": "~2.1.2",
     "mongoose": "~3.8.27",
     "morgan": "~1.2.2",
+    "body-parser": "~1.5.2",
+    "method-override": "~2.1.2",
     "optimist": "*",
-    "todomvc-common": "~0.1.4",
-    "traceview": "^2.7.4"
-},
-"devDependencies": {
+    "appoptics": "file:appoptics-2.7.4.tgz"
+  },
+  "devDependencies": {
     "axios": "^0.16.2",
     "randomstring": "^1.1.5"
   },

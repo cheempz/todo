@@ -23,8 +23,8 @@
  */
 
     // set up ========================
-    var tv = require('traceview');
-    tv.traceMode = 'always';
+  var ao = require('appoptics');
+  ao.traceMode = 'always';
 	var express  = require('express');
 	var app      = express(); 								// create our app w/ express
 	var mongoose = require('mongoose'); 					// mongoose for mongodb
