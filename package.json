@@ -11,7 +11,7 @@
     "body-parser": "~1.5.2",
     "method-override": "~2.1.2",
     "optimist": "*",
-    "appoptics": "file:appoptics-2.7.4.tgz"
+    "appoptics": "file:appoptics-2.7.5.tgz"
   },
   "devDependencies": {
     "axios": "^0.16.2",
