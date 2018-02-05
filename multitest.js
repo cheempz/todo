@@ -2,6 +2,7 @@
 
 const axios = require('axios')
 const randomstring = require('randomstring')
+const argv = require('minimist')(process.argv)
 
 
 let url = 'http://localhost:8088/api/todos'
@@ -17,11 +18,27 @@ function makePlainText (min=10, max=30) {
     return randomstring.generate(length)
 }
 
+if (argv.h || argv.help) {
+  console.log('usage: node multitest.js')
+  console.log('    options:')
+  console.log('        -i <interval in seconds>')
+  console.log('        -n <add/delete pairs per interval')
+  console.log()
+  process.exit(0)
+}
+
+// params
+let int = argv.i || 1         // interval in seconds
+let nPerInt = argv.n || 5     // number of adds per interval
+
+
 let inFlight = 0
-let int = 1         // interval in seconds
-let nPerInt = 5     // number of adds per interval
 let fn = 'add'      // add or delete
 let ids = []
+let addCount = 0
+let delCount = 0
+let addsSampled = 0
+let delsSampled = 0
 
 function submitAdds () {
     if (inFlight > 0) return
@@ -46,8 +63,20 @@ function submitAdds () {
         inFlight += 1
         axios[afn](...args).then(r => {
             inFlight -= 1
-            console.log(inFlight)
-
+            if (afn === 'post') {
+              addCount += 1
+            } else if (afn === 'delete') {
+              delCount += 1
+            }
+            console.log('total adds', addCount, 'total dels', delCount)
+            //console.log(inFlight)
+            if (r.headers['x-trace'] && r.headers['x-trace'].substr(-2) === '01') {
+              if (afn === 'post') {
+                addsSampled += 1
+              } else if (afn === 'delete') {
+                delsSampled += 1
+              }
+            }
             if (inFlight <= 0) {
                 if (fn === 'add') {
                     // get the IDs to delete and change the function
@@ -62,10 +91,10 @@ function submitAdds () {
                 let etString = hrdelta[0] + 's ' + hrdelta[1]/1000 + 'us'
                 let msg = fn === 'add' ? 'deleted' : 'added'
                 console.log(`${msg} ${nPerInt} in ${etString}`)
-
+                console.log('total adds sampled', addsSampled, 'deletes sampled', delsSampled)
             }
         }).catch(r => {
-            console.error(r.httpStatus)
+            console.error('ERROR:', r.httpStatus)
         })
     }
 }
