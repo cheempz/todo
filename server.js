@@ -25,6 +25,7 @@
     // set up ========================
   var ao = require('appoptics');
   ao.traceMode = 'always';
+  ao.sampleRate = 100000        // 10% (100000/1000000)
 	var express  = require('express');
 	var app      = express(); 								// create our app w/ express
 	var mongoose = require('mongoose'); 					// mongoose for mongodb
@@ -35,15 +36,19 @@
 
 	// configuration =================
 
-    //mongoose.connect('mongodb://' + argv.be_ip + ':80/my_database');
-    mongoose.connect('mongodb://127.0.0.1:27017/my_database');
+  //mongoose.connect('mongodb://' + argv.be_ip + ':80/my_database');
+  mongoose.connect('mongodb://127.0.0.1:27017/my_database');
 
-    app.use('/js', express.static(__dirname + '/js'));
-   	app.use('/bower_components', express.static(__dirname + '/bower_components'));
-	app.use(morgan('dev')); 										// log every request to the console
-	app.use(bodyParser.urlencoded({'extended':'true'})); 			// parse application/x-www-form-urlencoded
-	app.use(bodyParser.json()); 									// parse application/json
-	app.use(bodyParser.json({ type: 'application/vnd.api+json' })); // parse application/vnd.api+json as json
+  app.use('/js', express.static(__dirname + '/js'));
+  app.use('/bower_components', express.static(__dirname + '/bower_components'));
+  // log every request to the console
+  app.use(morgan('dev'));
+  // parse application/x-www-form-urlencoded
+  app.use(bodyParser.urlencoded({'extended':'true'}));
+  // parse application/json
+  app.use(bodyParser.json());
+  // parse application/vnd.api+json as json
+	app.use(bodyParser.json({ type: 'application/vnd.api+json' }));
 	app.use(methodOverride());
 
 	// define model =================
@@ -60,7 +65,8 @@
 		// use mongoose to get all todos in the database
 		Todo.find(function(err, todos) {
 
-			// if there is an error retrieving, send the error. nothing after res.send(err) will execute
+      // if there is an error retrieving, send the error.
+      // nothing after res.send(err) will execute
 			if (err)
 				res.send(err)
 
@@ -121,10 +127,11 @@
 
 	// application -------------------------------------------------------------
 	app.get('/', function(req, res) {
-		res.sendfile('index.html'); // load the single view file (angular will handle the page changes on the front-end)
-    });
+    // load the single view file (angular will handle the page changes on the front-end)
+		res.sendfile('index.html');
+  });
 
-    port = 8088;
+  port = 8088;
 
 	// listen (start app with node server.js) ======================================
 	app.listen(port, argv.fe_ip);
