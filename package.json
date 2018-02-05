@@ -4,17 +4,18 @@
   "main": "server.js",
   "dependencies": {
     "angular": "1.2.22",
-    "todomvc-common": "~0.1.4",
+    "appoptics": ">=2.7.11",
+    "body-parser": "~1.5.2",
     "express": "~4.7.2",
+    "method-override": "~2.1.2",
     "mongoose": "~3.8.27",
     "morgan": "~1.2.2",
-    "body-parser": "~1.5.2",
-    "method-override": "~2.1.2",
     "optimist": "*",
-    "appoptics": "file:appoptics-2.7.5.tgz"
+    "todomvc-common": "~0.1.4"
   },
   "devDependencies": {
     "axios": "^0.16.2",
+    "minimist": "^1.2.0",
     "randomstring": "^1.1.5"
   },
   "repository": {
