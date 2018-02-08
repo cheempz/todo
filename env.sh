@@ -17,6 +17,12 @@ if [[ -z "$ARG" ]]; then
     echo "you may also use the argument debug to define additional"
     echo "debugging variables"
     echo
+elif [[ "$ARG" = "java" ]]; then
+    echo "setting environment variables for standard java-collector"
+    echo "N.B. presumes ../oboe-test/collectors/java-collector/test-collector.crt"
+    export APPOPTICS_REPORTER=ssl
+    export APPOPTICS_COLLECTOR=localhost:12222
+    export APPOPTICS_TRUSTEDPATH=../oboe-test/collectors/java-collector/test-collector.crt
 elif [[ "$ARG" = "stg" ]]; then
     echo "setting stg environment variables"
     export APPOPTICS_REPORTER=ssl
