@@ -25,7 +25,6 @@
     // set up ========================
   var ao = require('appoptics');
   ao.traceMode = 'always';
-  ao.sampleRate = 100000        // 10% (100000/1000000)
 	var express  = require('express');
 	var app      = express(); 								// create our app w/ express
 	var mongoose = require('mongoose'); 					// mongoose for mongodb
@@ -34,11 +33,18 @@
 	var methodOverride = require('method-override'); // simulate DELETE and PUT (express4)
 	var argv = require('optimist').argv;
 
-	// configuration =================
-
-  //mongoose.connect('mongodb://' + argv.be_ip + ':80/my_database');
+  // configuration =================
+  var mongoHost = argv.be_ip || '127.0.0.1:27017'
+  if (!~mongoHost.indexOf(':')) mongoHost += ':27017'
   mongoose.connect('mongodb://127.0.0.1:27017/my_database');
 
+  var webServerHost = argv.fe_ip || '127.0.0.1:8088'
+  if (!~webServerHost.indexOf(':')) webServerHost += ':8088'
+
+  ao.sampleRate = +(argv.rate || ao.addon.MAX_SAMPLE_RATE)
+
+
+  // app configuration ===============
   app.use('/js', express.static(__dirname + '/js'));
   app.use('/bower_components', express.static(__dirname + '/bower_components'));
   // log every request to the console
@@ -131,8 +137,10 @@
 		res.sendfile('index.html');
   });
 
-  port = 8088;
+  var host = webServerHost.split(':')
+  var port = +host[1]
+  host = host[0]
 
 	// listen (start app with node server.js) ======================================
-	app.listen(port, argv.fe_ip);
-	console.log("App listening on port " + port);
+	app.listen(port, host);
+	console.log('App listening on', webServerHost, 'sample rate', ao.sampleRate)
