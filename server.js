@@ -43,6 +43,8 @@
 
   ao.sampleRate = +(argv.rate || ao.addon.MAX_SAMPLE_RATE)
 
+  var show = argv.s || argv['show-headers']
+
 
   // app configuration ===============
   app.use('/js', express.static(__dirname + '/js'));
@@ -68,6 +70,7 @@
 	// api ---------------------------------------------------------------------
 	// get all todos
 	app.get('/api/todos', function(req, res) {
+    show && console.log(req.headers)
 		// use mongoose to get all todos in the database
 		Todo.find(function(err, todos) {
 
@@ -82,6 +85,7 @@
 
 	// create todo and send back all todos after creation
 	app.post('/api/todos', function(req, res) {
+    show && console.log(req.headers)
 
 		// create a todo, information comes from AJAX request from Angular
 		Todo.create({
@@ -101,7 +105,8 @@
 
 	});
 
-	app.put('/api/todos/:todo_id', function(req, res){
+	app.put('/api/todos/:todo_id', function (req, res) {
+    show && console.log(req.headers)
 	  return Todo.findById(req.params.todo_id, function(err, todo) {
 	    todo.title = req.body.title;
 	    todo.completed = req.body.completed;
@@ -115,7 +120,8 @@
 	});
 
 	// delete a todo
-	app.delete('/api/todos/:todo_id', function(req, res) {
+	app.delete('/api/todos/:todo_id', function (req, res) {
+    show && console.log(req.headers)
 		Todo.remove({
 			_id : req.params.todo_id
 		}, function(err, todo) {
