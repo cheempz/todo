@@ -31,22 +31,35 @@
 	var morgan = require('morgan'); 			// log requests to the console (express4)
 	var bodyParser = require('body-parser'); 	// pull information from HTML POST (express4)
 	var methodOverride = require('method-override'); // simulate DELETE and PUT (express4)
-	var argv = require('optimist').argv;
+  var argv = require('optimist').argv;
+  var http = require('http')
 
+  //
   // configuration =================
+  //
+
+  // mongo DB
   var mongoHost = argv.be_ip || '127.0.0.1:27017'
   if (!~mongoHost.indexOf(':')) mongoHost += ':27017'
   mongoose.connect('mongodb://127.0.0.1:27017/my_database');
 
+  // web server
   var webServerHost = argv.fe_ip || '127.0.0.1:8088'
   if (!~webServerHost.indexOf(':')) webServerHost += ':8088'
 
+  // sample rate to use
   ao.sampleRate = +(argv.rate || ao.addon.MAX_SAMPLE_RATE)
 
+  // log headers to console
   var show = argv.s || argv['show-headers']
 
+  // host to log requests to. don't log if not present
+  var logHost = argv.log_ip || ''
 
+  //
   // app configuration ===============
+  //
+
   app.use('/js', express.static(__dirname + '/js'));
   app.use('/bower_components', express.static(__dirname + '/bower_components'));
   // log every request to the console
@@ -59,13 +72,17 @@
 	app.use(bodyParser.json({ type: 'application/vnd.api+json' }));
 	app.use(methodOverride());
 
-	// define model =================
+  //
+  // define mongo model =================
+  //
 	var Todo = mongoose.model('Todo', {
 		title : String,
 		completed: Boolean
 	});
 
-	// routes ======================================================================
+  //
+  // routes ======================================================================
+  //
 
 	// api ---------------------------------------------------------------------
 	// get all todos
@@ -135,7 +152,44 @@
 				res.json(todos);
 			});
 		});
-	});
+  });
+
+  // do a transaction to another server
+  app.get('/chain/:url', function (req, res) {
+    show && console.log(req.headers)
+
+    let options = {
+      protocol: 'http:',
+      port: 8881,
+      hostname: 'localhost',
+      method: 'post',
+      path: (req.params.url ? '/chain/' + req.params.url : '/'),
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    }
+
+    const oreq = http.request(options, function (ires) {
+      body = ''
+      ires.on('data', function (d) {
+        body += d
+      })
+      // and on end log it
+      ires.on('end', function () {
+        res.send(body)
+      })
+      ires.on('error', function (e) {
+        console.log('GOT ERROR', e)
+      })
+    })
+
+    oreq.on('error', function (err) {
+      console.log('got error', err)
+    })
+    oreq.write(JSON.stringify({url: options.path}))
+    oreq.end()
+
+  })
 
 	// application -------------------------------------------------------------
 	app.get('/', function(req, res) {
