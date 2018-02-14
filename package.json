@@ -1,6 +1,6 @@
 {
   "name": "todomvc-angular",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "main": "server.js",
   "dependencies": {
     "angular": "1.2.22",
@@ -15,7 +15,8 @@
     "todomvc-common": "~0.1.4",
     "axios": "^0.16.2",
     "minimist": "^1.2.0",
-    "randomstring": "^1.1.5"  },
+    "randomstring": "^1.1.5"
+  },
   "repository": {
     "type": "git",
     "url": "git://github.com/GoogleCloudPlatform/todomvc-mongodb.git"
