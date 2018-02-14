@@ -4,20 +4,18 @@
   "main": "server.js",
   "dependencies": {
     "angular": "1.2.22",
-    "appoptics": ">=2.7.11",
+    "appoptics": ">=2.7.13",
     "body-parser": "~1.5.2",
     "express": "~4.7.2",
+    "http": "0.0.0",
     "method-override": "~2.1.2",
     "mongoose": "~3.8.27",
     "morgan": "~1.2.2",
     "optimist": "*",
-    "todomvc-common": "~0.1.4"
-  },
-  "devDependencies": {
+    "todomvc-common": "~0.1.4",
     "axios": "^0.16.2",
     "minimist": "^1.2.0",
-    "randomstring": "^1.1.5"
-  },
+    "randomstring": "^1.1.5"  },
   "repository": {
     "type": "git",
     "url": "git://github.com/GoogleCloudPlatform/todomvc-mongodb.git"
