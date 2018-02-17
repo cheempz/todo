@@ -200,11 +200,14 @@
 
     var q = req.query.target
 
+    function makePrefix (URL) {
+      return '--- response from ' + URL + ' ---\nheaders: '
+    }
+
     if (!q) {
-      res.send('final headers: ' + JSON.stringify(req.headers))
+      res.send('this is the end!')
       return
     }
-    //q = q.slice(q.indexOf('target=') + 'target='.length)
 
     var options = url.parse(q)
     if (req.headers['X-Trace']) {
@@ -217,11 +220,11 @@
       ires.on('data', function (d) {
         body += d
       })
-      // and on end return it along with our own headers.
+      // on end return it along with the headers
       ires.on('end', function () {
-        var headers = 'headers: ' + JSON.stringify(ires.headers)
-        body += headers
-        res.send(body)
+        var p = makePrefix(q)
+        var h = JSON.stringify(ires.headers)
+        res.send(p + h + '\nbody: ' + body + '\n')
       })
       ires.on('error', function (e) {
         console.log('GOT ERROR', e)
@@ -235,7 +238,6 @@
       res.send(JSON.stringify(err))
       oreq.end()
     })
-    //oreq.write(JSON.stringify({ url: options.path }))
     oreq.end('')
 
   })
