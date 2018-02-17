@@ -6,7 +6,7 @@ if [[ -z "$AO_TOKEN_STG" ]]; then
     return
 fi
 
-# define this for all consitions
+# define this for all options
 export APPOPTICS_SERVICE_KEY=${AO_TOKEN_STG}:node-todo-test
 
 if [[ -z "$ARG" ]]; then
@@ -27,10 +27,22 @@ elif [[ "$ARG" = "stg" ]]; then
     echo "setting stg environment variables"
     export APPOPTICS_REPORTER=ssl
     export APPOPTICS_COLLECTOR=collector-stg.appoptics.com
+    unset APPOPTICS_TRUSTEDPATH
 elif [[ "$ARG" = "prod" ]]; then
     echo "ERROR: prod is not yet implemented"
+elif [[ "$ARG" = "bindings" ]]; then
+    # use these to provide authentication and specify an alternate branch/tag
+    # for the install-appoptics-bindings.js script.
+    # N.B. if fetching from packagecloud setting the next two are a good
+    # alternative as packagecloud's proxy doesn't have authorization issues
+    # when they are installed in a project .npmrc file, not the user .npmrc
+    # file.
+    export AO_TEST_PACKAGE=librato/node-appoptics-bindings#per-request-v2
+    # this requires that one's git access token is already defined.
+    export AO_TEST_GITAUTH=${AO_TOKEN_GIT}
+
 elif [[ "$ARG" = "debug" ]]; then
-    echo "setting debug environment variables"
+    echo "NYI - setting debug environment variables"
     #export APPOPTICS_DEBUG_LEVEL=6
     #export APPOPTICS_SHOW_GYP=1
 
@@ -38,6 +50,13 @@ elif [[ "$ARG" = "debug" ]]; then
     #export AO_TEST_BINDINGS_OUTPUT=1
     # see dist/debug-loggers.js for DEBUG options
     #export DEBUG
+elif [[ "$ARG" = "help" ]]; then
+    echo "help is not implemented. read the code."
+    echo "But to test try: '$ node server.js' and (optionally) '$ node tiny-server.js'"
+    echo "Each has defaults and command line options documented in the code."
+    echo
+    echo "multitest.js creates a load on the server though it's not very evenly"
+    echo "distributed at this point."
 else
     echo "ERROR $ARG invalid"
 fi
