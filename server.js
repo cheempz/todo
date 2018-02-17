@@ -33,6 +33,7 @@
 	var methodOverride = require('method-override'); // simulate DELETE and PUT (express4)
   var argv = require('optimist').argv;
   var http = require('http')
+  var url = require('url')
 
   //
   // configuration =================
@@ -47,8 +48,8 @@
   var webServerHost = argv.fe_ip || '127.0.0.1:8088'
   if (!~webServerHost.indexOf(':')) webServerHost += ':8088'
 
-  // sample rate to use
-  ao.sampleRate = +(argv.rate || ao.addon.MAX_SAMPLE_RATE)
+  // sample rate to use. zero is valid so check
+  ao.sampleRate = 'rate' in argv ? +argv.rate : ao.addon.MAX_SAMPLE_RATE
 
   // log headers to console
   var show = argv.s || argv['show-headers']
@@ -155,7 +156,7 @@
   });
 
   // do a transaction to another server
-  app.get('/chain/:url', function (req, res) {
+  app.get('/downstream/:url', function (req, res) {
     show && console.log(req.headers)
 
     let options = {
@@ -163,7 +164,7 @@
       port: 8881,
       hostname: 'localhost',
       method: 'post',
-      path: (req.params.url ? '/chain/' + req.params.url : '/'),
+      path: (req.params.url ? '/' + req.params.url : '/'),
       headers: {
         'Content-Type': 'application/json'
       }
@@ -188,6 +189,54 @@
     })
     oreq.write(JSON.stringify({url: options.path}))
     oreq.end()
+
+  })
+
+  //
+  // now make a chained URL
+  //
+  app.get('/chain', function (req, res) {
+    show && console.log(req.headers)
+
+    var q = req.query.target
+
+    if (!q) {
+      res.send('final headers: ' + JSON.stringify(req.headers))
+      return
+    }
+    //q = q.slice(q.indexOf('target=') + 'target='.length)
+
+    var options = url.parse(q)
+    if (req.headers['X-Trace']) {
+      options.headers = {'X-Trace': req.headers['X-Trace']}
+    }
+
+    // now do the outbound request and get the inbound response
+    const oreq = http.request(options, function (ires) {
+      var body = ''
+      ires.on('data', function (d) {
+        body += d
+      })
+      // and on end return it along with our own headers.
+      ires.on('end', function () {
+        var headers = 'headers: ' + JSON.stringify(ires.headers)
+        body += headers
+        res.send(body)
+      })
+      ires.on('error', function (e) {
+        console.log('GOT ERROR', e)
+      })
+    })
+
+    // if the outbound request failed send the error
+    oreq.on('error', function (err) {
+      console.log('got error', err)
+      res.statusCode = 422
+      res.send(JSON.stringify(err))
+      oreq.end()
+    })
+    //oreq.write(JSON.stringify({ url: options.path }))
+    oreq.end('')
 
   })
 
