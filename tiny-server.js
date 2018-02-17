@@ -2,6 +2,8 @@ const http = require('http')
 const fs = require('fs')
 const argv = require('minimist')(process.argv)
 
+const ao = require('appoptics')
+
 const port = argv.p || argv.port || 8881
 const host = argv.host || 'localhost'
 const show = argv.s || argv.show
