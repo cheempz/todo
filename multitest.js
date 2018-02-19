@@ -28,8 +28,12 @@ if (argv.h || argv.help) {
 }
 
 // params
-let int = argv.i || 1         // interval in seconds
+let int = argv.i || 5         // interval in seconds
 let nPerInt = argv.n || 5     // number of adds per interval
+
+if (argv.ws_ip) {
+  url = 'http://' + argv.ws_ip + '/api/todos'
+}
 
 
 let inFlight = 0
@@ -83,7 +87,6 @@ function submitAdds () {
                     debugger
                     ids = r.data
                     fn = 'delete'
-                    //console.log('added', ids)
                 } else {
                     fn = 'add'
                 }
