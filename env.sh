@@ -23,6 +23,13 @@ elif [[ "$ARG" = "java" ]]; then
     export APPOPTICS_REPORTER=ssl
     export APPOPTICS_COLLECTOR=localhost:12222
     export APPOPTICS_TRUSTEDPATH=../oboe-test/collectors/java-collector/test-collector.crt
+elif [[ "$ARG" = "scribe" ]]; then
+    echo "setting environment variables for standard scribe-collector"
+    echo "N.B. presumes ../oboe-test/collectors/scribe-collector/test-collector.crt"
+    echo "WARNING - scribe has cert problems, not functional"
+    export APPOPTICS_REPORTER=ssl
+    export APPOPTICS_COLLECTOR=localhost:4444
+    export APPOPTICS_TRUSTEDPATH=../oboe-test/collectors/scribe-collector/ca.crt
 elif [[ "$ARG" = "stg" ]]; then
     echo "setting stg environment variables"
     export APPOPTICS_REPORTER=ssl
@@ -42,7 +49,10 @@ elif [[ "$ARG" = "bindings" ]]; then
     export AO_TEST_GITAUTH=${AO_TOKEN_GIT}
 
 elif [[ "$ARG" = "debug" ]]; then
-    echo "NYI - setting debug environment variables"
+    # log=$(docker inspect -f '{{.LogPath}}' ${container-name} 2> /dev/null)
+    # truncate -s 0 $log
+    echo "setting debug environment variables to standard"
+    export DEBUG=appoptics:error,appoptics:info,appoptics:debug
     #export APPOPTICS_DEBUG_LEVEL=6
     #export APPOPTICS_SHOW_GYP=1
 
