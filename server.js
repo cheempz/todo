@@ -36,7 +36,7 @@
   var url = require('url')
 
   //
-  // configuration =================
+  // configuration and options =================
   //
 
   // mongo DB
@@ -48,8 +48,10 @@
   var webServerHost = argv.fe_ip || '127.0.0.1:8088'
   if (!~webServerHost.indexOf(':')) webServerHost += ':8088'
 
-  // sample rate to use. zero is valid so check
-  ao.sampleRate = 'rate' in argv ? +argv.rate : ao.addon.MAX_SAMPLE_RATE
+  var rate = 'rate' in argv ? +argv.rate : ao.addon.MAX_SAMPLE_RATE
+  // also allow shorthand -r which does 0-100 (for percents)
+  if ('r' in argv) rate = +argv.r * 10000
+  ao.sampleRate = rate
 
   // log headers to console
   var show = argv.s || argv['show-headers']
