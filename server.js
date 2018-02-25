@@ -161,7 +161,7 @@
   app.get('/downstream/:url', function (req, res) {
     show && console.log(req.headers)
 
-    let options = {
+    var options = {
       protocol: 'http:',
       port: 8881,
       hostname: 'localhost',
