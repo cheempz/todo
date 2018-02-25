@@ -1,0 +1,63 @@
+# supporting backends for node-appoptics testing
+#
+# requires copying ../oboe-test/collectors/<collector-name>/<name>.crt
+# to test/certs/<collector-name>.crt
+#
+version: '2.1'
+
+services:
+  web-aaa:
+    image: todo.yml
+    build:
+      context: test/docker
+      dockerfile: todo.yml
+      args:
+        # if AO_TEST_PACKAGE and AO_TEST_GITAUTH are not set then the
+        # bindings installation will attempt to download the HEAD of the
+        # master branch from the public repository.
+        #
+        # expect librato/node-appoptics-bindings#new-liboboe while private
+        - AO_TEST_PACKAGE
+        # expect a git auth token (or extend Dockerfile with user and password)
+        - AO_TEST_GITAUTH
+        # - AO_TEST_GITUSER
+        # - AO_TEST_GITPASS
+
+        # scribe collector
+        # - AO_TEST_COLLECTOR=${AO_COLLECTOR:-scribe-collector:4444}
+        # - AO_TEST_COLLECTOR_CERT=${AO_COLLECTOR_CERT:-test/certs/scribe-collector.crt}
+
+        # java collector
+        # - AO_TEST_COLLECTOR=${AO_COLLECTOR:-java-collector:12222}
+        # - AO_TEST_COLLECTOR_CERT=${AO_COLLECTOR_CERT:-test/certs/java-collector.crt}
+
+        # staging collector - depends on $AO_TOKEN_STG being valid
+        - APPOPTICS_COLLECTOR=collector-stg.appoptics.com
+        - APPOPTICS_REPORTER=ssl
+
+        # the token part is private, so pass it in via the environment
+        - TODO_SERVICE_KEY=$AO_TOKEN_STG:web-aaa
+        # set the backend (mongodb) address to use
+        - TODO_MONGODB_ADDRESS=mongo_2_4:27017
+    #volumes:
+      # map the directory this file is in to the /appoptics/ directory
+      #- "${PWD}:/appoptics/"
+    logging:
+      options:
+        max-file: "1"
+        max-size: 50m
+
+
+  mongo_2_4:
+    image: "mongo_2_4"
+    build:
+      context: test/docker/
+      dockerfile: mongo_2_4.yml
+    logging:
+      options:
+        max-file: "1"
+        max-size: 50m
+    ports:
+      # host:container (avoid conflict with ao test host port)
+      - "27027:27017"
+
