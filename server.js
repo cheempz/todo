@@ -43,10 +43,17 @@
   console.log(JSON.stringify(argv))
   var mongoHost = typeof argv.be_ip === 'string' ? argv.be_ip : '127.0.0.1:27017'
   if (!~mongoHost.indexOf(':')) mongoHost += ':27017'
-  mongoose.connect('mongodb://' + mongoHost + '/my_database');
+
+
+  var mOpts = {
+    reconnectTries: 10,
+    reconnectInterval: 2000
+  }
+
+  mongoose.connect('mongodb://' + mongoHost + '/my_database', mOpts)
 
   // web server
-  var webServerHost = argv.fe_ip || '127.0.0.1:8088'
+  var webServerHost = argv.fe_ip || '0.0.0.0:8088'
   if (!~webServerHost.indexOf(':')) webServerHost += ':8088'
 
   var rate = 'rate' in argv ? +argv.rate : 1000000
