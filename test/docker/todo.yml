@@ -4,13 +4,19 @@ MAINTAINER Iliyan Trifonov <iliyan.trifonov@gmail.com>
 
 # use mirrors for faster apt downloads no matter where the machine that
 # builds the image is
-#RUN echo "deb mirror://mirrors.ubuntu.com/mirrors.txt trusty main restricted #universe multiverse" > /etc/apt/sources.list; \
-	#echo "deb mirror://mirrors.ubuntu.com/mirrors.txt trusty-updates main restricted universe multiverse" >> /etc/apt/sources.list; \
-	#echo "deb mirror://mirrors.ubuntu.com/mirrors.txt trusty-backports main restricted universe multiverse" >> /etc/apt/sources.list; \
-	#echo "deb mirror://mirrors.ubuntu.com/mirrors.txt trusty-security main restricted universe multiverse" >> /etc/apt/sources.list
+RUN echo "deb mirror://mirrors.ubuntu.com/mirrors.txt xenial main restricted universe multiverse" > /etc/apt/sources.list; \
+	echo "deb mirror://mirrors.ubuntu.com/mirrors.txt xenial-updates main restricted universe multiverse" >> /etc/apt/sources.list; \
+	echo "deb mirror://mirrors.ubuntu.com/mirrors.txt xenial-backports main restricted universe multiverse" >> /etc/apt/sources.list; \
+	echo "deb mirror://mirrors.ubuntu.com/mirrors.txt xenial-security main restricted universe multiverse" >> /etc/apt/sources.list
 
 # install required software before using nvm/node/npm/bower
-RUN apt-get update && apt-get install -y curl git python build-essential
+RUN apt-get update && \
+    apt-get install -y curl git python build-essential && \
+    apt-get install -y inetutils-ping && \
+    apt-get install -y inetutils-telnet
+
+# get rid of sh and use bash
+RUN rm /bin/sh && ln -s /bin/bash /bin/sh
 
 # add user node and use it to install node/npm and run the app
 RUN useradd --home /home/node -m -U -s /bin/bash node
@@ -50,24 +56,27 @@ RUN . ~/.nvm/nvm.sh && curl -s https://bb2874f186eb519f73ff3f8c64a777be6522ac884
 # environment up now. that allows docker to use the cached images prior to this
 # point when changing only the environment variables.
 #
+ARG AO_TOKEN_STG
 ARG TODO_SERVICE_KEY
 ARG TODO_MONGODB_ADDRESS
 ARG APPOPTICS_COLLECTOR
 ARG APPOPTICS_REPORTER
 
+ENV AO_TOKEN_STG $AO_TOKEN_STG
 ENV APPOPTICS_SERVICE_KEY $TODO_SERVICE_KEY
 
-ENV TODO_MONGODB_ADDRESS=${TODO_MONGODB_ADDRESS:-mongo_2_4:17017}
-ENV APPOPTICS_COLLECTOR=$APPOPTICS_COLLECTOR
-ENV APPOPTICS_REPORTER=$APPOPTICS_REPORTER
-# these provide a different location for appoptics-bindings.
-ENV AO_TEST_GITAUTH=$AO_TEST_GITAUTH
-ENV AO_TEST_PACKAGE=$AO_TEST_PACKAGE
+ENV TODO_MONGODB_ADDRESS ${TODO_MONGODB_ADDRESS:-mongo_2_4:27017}
+ENV APPOPTICS_COLLECTOR $APPOPTICS_COLLECTOR
+ENV APPOPTICS_REPORTER $APPOPTICS_REPORTER
 
+EXPOSE 8088
 # change to force reinstall of node dependencies.
-ARG TODO_REINSTALL
+ARG TODO_REINSTALL=unknown
 
-RUN X=${TODO_REINSTALL} env && . ~/.nvm/nvm.sh && cd $HOME/todo && npm install .
+RUN X=${TODO_REINSTALL} cd $HOME/todo && \
+    source $HOME/todo/env.sh stg && \
+    source ~/.nvm/nvm.sh && \
+    npm install .
 CMD ["/bin/bash", "-c", "cd $HOME/todo && source ~/.nvm/nvm.sh && node server --be_ip=${TODO_MONGODB_ADDRESS} -r 100"]
 
 # execute an interval timer once every 10 seconds to keep the foreground

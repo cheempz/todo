@@ -16,10 +16,11 @@ services:
         # bindings installation will attempt to download the HEAD of the
         # master branch from the public repository.
         #
+        - AO_TOKEN_STG=${AO_TOKEN_STG}
         # expect librato/node-appoptics-bindings#new-liboboe while private
-        - AO_TEST_PACKAGE
+        #- AO_TEST_PACKAGE=${AO_TEST_PACKAGE}
         # expect a git auth token (or extend Dockerfile with user and password)
-        - AO_TEST_GITAUTH
+        #- AO_TEST_GITAUTH=${AO_TEST_GITAUTH}
         # - AO_TEST_GITUSER
         # - AO_TEST_GITPASS
 
@@ -47,7 +48,7 @@ services:
         max-file: "1"
         max-size: 50m
     ports:
-      - "127.0.0.1:8088:8088"
+      - "8088:8088"
 
 
   mongo_2_4:
