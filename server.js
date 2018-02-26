@@ -40,15 +40,16 @@
   //
 
   // mongo DB
-  var mongoHost = argv.be_ip || '127.0.0.1:27017'
+  console.log(JSON.stringify(argv))
+  var mongoHost = typeof argv.be_ip === 'string' ? argv.be_ip : '127.0.0.1:27017'
   if (!~mongoHost.indexOf(':')) mongoHost += ':27017'
-  mongoose.connect('mongodb://127.0.0.1:27017/my_database');
+  mongoose.connect('mongodb://' + mongoHost + '/my_database');
 
   // web server
   var webServerHost = argv.fe_ip || '127.0.0.1:8088'
   if (!~webServerHost.indexOf(':')) webServerHost += ':8088'
 
-  var rate = 'rate' in argv ? +argv.rate : ao.addon.MAX_SAMPLE_RATE
+  var rate = 'rate' in argv ? +argv.rate : 1000000
   // also allow shorthand -r which does 0-100 (for percents)
   if ('r' in argv) rate = +argv.r * 10000
   ao.sampleRate = rate
