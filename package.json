@@ -4,7 +4,7 @@
   "main": "server.js",
   "dependencies": {
     "angular": "1.2.22",
-    "appoptics": ">=3.1.0",
+    "appoptics": ">=3.4.0",
     "axios": "^0.16.2",
     "body-parser": "~1.5.2",
     "express": "~4.7.2",
