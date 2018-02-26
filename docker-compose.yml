@@ -46,6 +46,8 @@ services:
       options:
         max-file: "1"
         max-size: 50m
+    ports:
+      - "127.0.0.1:8088:8088"
 
 
   mongo_2_4:
