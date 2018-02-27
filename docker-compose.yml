@@ -50,6 +50,43 @@ services:
     ports:
       - "8088:8088"
 
+  web-bbb:
+    image: todo.yml
+    build:
+      context: test/docker
+      dockerfile: todo.yml
+      args:
+        - AO_TOKEN_STG=${AO_TOKEN_STG}
+        - APPOPTICS_COLLECTOR=collector-stg.appoptics.com
+        - APPOPTICS_REPORTER=ssl
+
+        # the token part is private, so pass it in via the environment
+        - TODO_SERVICE_KEY=$AO_TOKEN_STG:web-bbb
+        # set the backend (mongodb) address to use
+        - TODO_MONGODB_ADDRESS=mongo_2_4:27017
+    logging:
+      options:
+        max-file: "1"
+        max-size: 50m
+
+  web-ccc:
+    image: todo.yml
+    build:
+      context: test/docker
+      dockerfile: todo.yml
+      args:
+        - AO_TOKEN_STG=${AO_TOKEN_STG}
+        - APPOPTICS_COLLECTOR=collector-stg.appoptics.com
+        - APPOPTICS_REPORTER=ssl
+
+        # the token part is private, so pass it in via the environment
+        - TODO_SERVICE_KEY=$AO_TOKEN_STG:web-ccc
+        # set the backend (mongodb) address to use
+        - TODO_MONGODB_ADDRESS=mongo_2_4:27017
+    logging:
+      options:
+        max-file: "1"
+        max-size: 50m
 
   mongo_2_4:
     image: "mongo_2_4"
