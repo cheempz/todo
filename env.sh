@@ -7,7 +7,8 @@ if [[ -z "$AO_TOKEN_STG" ]]; then
 fi
 
 # define this for all options
-export APPOPTICS_SERVICE_KEY=${AO_TOKEN_STG}:node-todo-test
+export APPOPTICS_SERVICE_KEY=${AO_TOKEN_STG}:${AO_SERVICE_NAME:-node-todo-test}
+echo Defined service as $APPOPTICS_SERVICE_KEY
 
 if [[ -z "$ARG" ]]; then
     echo "source this script with an argument of stg or prod. it"

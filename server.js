@@ -40,7 +40,6 @@
   //
 
   // mongo DB
-  console.log(JSON.stringify(argv))
   var mongoHost = typeof argv.be_ip === 'string' ? argv.be_ip : '127.0.0.1:27017'
   if (!~mongoHost.indexOf(':')) mongoHost += ':27017'
 
@@ -215,7 +214,7 @@
     }
 
     if (!q) {
-      res.send('this is the end!')
+      res.send('this is the end!\n')
       return
     }
 
@@ -263,5 +262,7 @@
   host = host[0]
 
 	// listen (start app with node server.js) ======================================
-	app.listen(port, host);
-	console.log('App listening on', webServerHost, 'sample rate', ao.sampleRate)
+  app.listen(port, host);
+  var tty = require('tty')
+  var text = tty.isatty(process.stdout.fd) ? 'on a tty' : 'not a tty'
+	console.log('App listening on', webServerHost, 'sample rate', ao.sampleRate, text)
