@@ -9,11 +9,11 @@ services:
     ports:
       - "8088:8088"
     environment:
-      - TODO_SERVICE_KEY=${AO_TOKEN_STG}:web-aaa
       - TODO_SERVER_OPTIONS=${TODO_SERVER_OPTIONS}
     build:
       context: .
       args:
+        - TODO_SERVICE_KEY=${AO_TOKEN_STG}:web-aaa
         # expect librato/node-appoptics-bindings#new-liboboe while private
         #- AO_TEST_PACKAGE=${AO_TEST_PACKAGE}
         # expect a git auth token (or extend Dockerfile with user and password)
@@ -41,10 +41,10 @@ services:
         - TODO_REFETCH
         # and reinstall the application
         - TODO_REINSTALL
-    image: todo.yml
+    image: todo-web-aaa
     #volumes:
-      # map the directory this file is in to the /appoptics/ directory
-      #- "${PWD}:/appoptics/"
+      # map the directory this file is in to the todo directory
+      # - "${PWD}:/home/node/todo/"
     logging:
       options:
         max-file: "1"
@@ -54,11 +54,11 @@ services:
     expose:
       - "8088"
     environment:
-      - TODO_SERVICE_KEY=${AO_TOKEN_STG}:web-bbb
       - TODO_SERVER_OPTIONS=${TODO_SERVER_OPTIONS}
     build:
       context: .
       args:
+        - TODO_SERVICE_KEY=${AO_TOKEN_STG}:web-bbb
         - APPOPTICS_COLLECTOR=collector-stg.appoptics.com
         - APPOPTICS_REPORTER=ssl
 
@@ -66,7 +66,10 @@ services:
         - TODO_MONGODB_ADDRESS=mongo_2_4:27017
         - TODO_REFETCH
         - TODO_REINSTALL
-    image: todo.yml
+    image: todo-web-bbb
+    #volumes:
+      # map the directory this file is in to the todo directory
+      # - "${PWD}:/home/node/todo/"
     logging:
       options:
         max-file: "1"
@@ -76,11 +79,11 @@ services:
     expose:
       - "8088"
     environment:
-      - TODO_SERVICE_KEY=${AO_TOKEN_STG}:web-ccc
       - TODO_SERVER_OPTIONS=${TODO_SERVER_OPTIONS}
     build:
       context: .
       args:
+        - TODO_SERVICE_KEY=${AO_TOKEN_STG}:web-ccc
         - APPOPTICS_COLLECTOR=collector-stg.appoptics.com
         - APPOPTICS_REPORTER=ssl
 
@@ -89,7 +92,10 @@ services:
 
         - TODO_REFETCH
         - TODO_REINSTALL
-    image: todo.yml
+    image: todo-web-ccc
+    #volumes:
+      # map the directory this file is in to the todo directory
+      # - "${PWD}:/home/node/todo/"
     logging:
       options:
         max-file: "1"
@@ -107,4 +113,3 @@ services:
     ports:
       # host:container (avoid conflict with ao test host port)
       - "27027:27017"
-
