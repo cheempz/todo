@@ -1,6 +1,7 @@
 FROM ubuntu:16.04
 
-MAINTAINER Iliyan Trifonov <iliyan.trifonov@gmail.com>
+# Created by Iliyan Trifonov <iliyan.trifonov@gmail.com>
+# modified by Bruce A. MacNaughton <bmacnaughton@gmail.com>
 
 # use mirrors for faster apt downloads no matter where the machine that
 # builds the image is
@@ -13,7 +14,8 @@ RUN echo "deb mirror://mirrors.ubuntu.com/mirrors.txt xenial main restricted uni
 RUN apt-get update && \
     apt-get install -y curl git python build-essential && \
     apt-get install -y inetutils-ping && \
-    apt-get install -y inetutils-telnet
+    apt-get install -y inetutils-telnet && \
+    apt-get install -y emacs
 
 # get rid of sh and use bash
 RUN rm /bin/sh && ln -s /bin/bash /bin/sh
@@ -27,13 +29,6 @@ RUN echo 'Defaults !requiretty' >> /etc/sudoers; \
 
 # run all of the following commands as user node from now on
 USER node
-
-# set this to something different to force rebuilds at this point.
-ARG TODO_REFETCH=0
-# get the application, extract it, move it, and name the dir todo
-RUN REFETCH=${TODO_REFETCH} cd $HOME && curl -LkSs https://api.github.com/repos/bmacnaughton/todomvc-mongodb/tarball -o todo.tar.gz \
-    && mkdir -p tmp && tar -zvxf todo.tar.gz -C tmp \
-    && mv tmp/$(ls -t tmp/ | head -1) $HOME/todo
 
 # get nvm
 RUN curl https://raw.githubusercontent.com/creationix/nvm/v0.33.1/install.sh | bash
@@ -51,34 +46,7 @@ RUN . ~/.nvm/nvm.sh && nvm install $NODE_VERSION && nvm alias default $NODE_VERS
 # install the packagecloud proxy.
 RUN . ~/.nvm/nvm.sh && curl -s https://bb2874f186eb519f73ff3f8c64a777be6522ac88490ed0ca:@packagecloud.io/install/repositories/AppOptics/apm-node/script.node.sh | bash
 
-#
-# most of the heavy lifting part of building the image is done now, so set the
-# environment up now. that allows docker to use the cached images prior to this
-# point when changing only the environment variables.
-#
-ARG AO_TOKEN_STG
-ARG TODO_SERVICE_KEY
-ARG TODO_MONGODB_ADDRESS
-ARG APPOPTICS_COLLECTOR
-ARG APPOPTICS_REPORTER
-
-ENV AO_TOKEN_STG $AO_TOKEN_STG
-ENV APPOPTICS_SERVICE_KEY $TODO_SERVICE_KEY
-
-ENV TODO_MONGODB_ADDRESS ${TODO_MONGODB_ADDRESS:-mongo_2_4:27017}
-ENV APPOPTICS_COLLECTOR $APPOPTICS_COLLECTOR
-ENV APPOPTICS_REPORTER $APPOPTICS_REPORTER
-
-EXPOSE 8088
-# change to force reinstall of node dependencies.
-ARG TODO_REINSTALL=unknown
-
-RUN X=${TODO_REINSTALL} cd $HOME/todo && \
-    source $HOME/todo/env.sh stg && \
-    source ~/.nvm/nvm.sh && \
-    npm install .
-CMD ["/bin/bash", "-c", "cd $HOME/todo && source ~/.nvm/nvm.sh && node server --be_ip=${TODO_MONGODB_ADDRESS} -r 100"]
 
 # execute an interval timer once every 10 seconds to keep the foreground
 # process alive.
-#CMD ["/bin/bash", "-c", "source ~/.nvm/nvm.sh && node -e 'setInterval(function() {}, 10000)'"]
+CMD ["/bin/bash", "-c", "source ~/.nvm/nvm.sh && node -e 'setInterval(function() {}, 10000)'"]
