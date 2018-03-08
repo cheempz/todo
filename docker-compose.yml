@@ -20,14 +20,15 @@ services:
         #- AO_TEST_GITAUTH=${AO_TEST_GITAUTH}
         # - AO_TEST_GITUSER
         # - AO_TEST_GITPASS
+        - APPOPTICS_DEBUG_LEVEL=${APPOPTICS_DEBUG_LEVEL:-2}
 
         # scribe collector
         # - AO_TEST_COLLECTOR=${AO_COLLECTOR:-scribe-collector:4444}
         # - AO_TEST_COLLECTOR_CERT=${AO_COLLECTOR_CERT:-test/certs/scribe-collector.crt}
 
         # java collector
-        # - AO_TEST_COLLECTOR=${AO_COLLECTOR:-java-collector:12222}
-        # - AO_TEST_COLLECTOR_CERT=${AO_COLLECTOR_CERT:-test/certs/java-collector.crt}
+        # - APPOPTICS_COLLECTOR=${AO_COLLECTOR:-java-collector:12222}
+        # - APPOPTICS_TRUSTEDPATH={AO_COLLECTOR_CERT:-test/certs/java-collector.crt}
 
         # staging collector - depends on $AO_TOKEN_STG being valid
         - APPOPTICS_COLLECTOR=collector-stg.appoptics.com
@@ -59,6 +60,8 @@ services:
       context: .
       args:
         - TODO_SERVICE_KEY=${AO_TOKEN_STG}:web-bbb
+
+        - APPOPTICS_DEBUG_LEVEL=${APPOPTICS_DEBUG_LEVEL:-2}
         - APPOPTICS_COLLECTOR=collector-stg.appoptics.com
         - APPOPTICS_REPORTER=ssl
 
@@ -84,6 +87,8 @@ services:
       context: .
       args:
         - TODO_SERVICE_KEY=${AO_TOKEN_STG}:web-ccc
+
+        - APPOPTICS_DEBUG_LEVEL=${APPOPTICS_DEBUG_LEVEL:-2}
         - APPOPTICS_COLLECTOR=collector-stg.appoptics.com
         - APPOPTICS_REPORTER=ssl
 
