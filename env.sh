@@ -50,8 +50,12 @@ elif [[ "$ARG" = "bindings" ]]; then
     export AO_TEST_GITAUTH=${AO_TOKEN_GIT}
 
 elif [[ "$ARG" = "debug" ]]; then
+    # docker debugging helpers
+    # (truncate log)
     # log=$(docker inspect -f '{{.LogPath}}' ${container-name} 2> /dev/null)
     # truncate -s 0 $log
+    # (view environment for container)
+    # docker inspect -f '{{ json .Config.Env}}' todo-web-aaa
     echo "setting debug environment variables to standard"
     export DEBUG=appoptics:error,appoptics:info,appoptics:debug
     #export APPOPTICS_DEBUG_LEVEL=6
