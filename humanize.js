@@ -23,6 +23,13 @@ var important = [
   'Edge'
 ]
 
+var notImportant = [
+  'Backtrace'
+]
+
+// set true to include important, false to exclude not important
+var include = false
+
 // if there is a file try to open it
 let file = argv._[0]
 
@@ -56,11 +63,20 @@ while ((results = logLineRegex.exec(text)) !== null) {
     continue
   }
   objCount += 1
-  // make an abbreviated object (skip noise like backtrace)
   let o = {}
-  for (let k of important) {
-    if (k in logObject) {
-      o[k] = logObject[k]
+  // make an abbreviated object (skip noise like backtrace)
+  // if include only include those specified in important else
+  // remove those in notImportant.
+  if (include) {
+    for (let k of important) {
+      if (k in logObject) {
+        o[k] = logObject[k]
+      }
+    }
+  } else {
+    Object.assign(o, logObject)
+    for (let k of notImportant) {
+      delete o[k]
     }
   }
   if ('X-Trace' in o) {
