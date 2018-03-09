@@ -55,7 +55,7 @@ angular.module('todomvc')
 			};
 			todoStorage.post(newTodo).success(function(data) {
 				$scope.newTodo = '';
-				$scope.todos = data;
+        $scope.todos = data.todos;
 			});
 		};
 
@@ -107,7 +107,7 @@ angular.module('todomvc')
 		$scope.markAll = function (completed) {
 			$scope.todos.forEach(function (todo) {
 				todo.completed = !completed;
-				todoStorage.put(todo._id, 
+				todoStorage.put(todo._id,
 					{title: todo.title, completed: todo.completed});
 			});
 			todoStorage.get().success(function(data) {
