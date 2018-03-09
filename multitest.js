@@ -34,6 +34,7 @@ if (argv.ws_ip) {
   url = 'http://' + argv.ws_ip + '/api/todos'
   delayUrl = 'http://' + argv.ws_ip + '/delay/'
 }
+let transaction = 'delay' in argv ? 'delay' : 'addDelete'
 
 
 let inFlight = 0    // number of transactions in progress
@@ -197,8 +198,9 @@ if (argv.delete) {
 
 startTime = mstime()
 
-if ('delay' in argv) {
-  // just make the delayed calls
+if (transaction === 'delay') {
+  // just make the delayed calls.
+  // TODO BAM consider adjusting interval for delay in transaction?
   let iid = setInterval(function () {
     executeDelay(0, +argv.delay).then(r => console.log(r.data))
   }, interval / transactionsPerInterval)
