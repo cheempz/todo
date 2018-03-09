@@ -35,6 +35,7 @@
   var http = require('http')
   var url = require('url')
 
+  const mstime = () => new Date().getTime()
   //
   // configuration and options =================
   //
@@ -130,11 +131,13 @@
 			if (err)
 				res.send(err);
 
-			// get and return all the todos after you create another
+      // get and return all the todos after you create another
+      // also return the specific todo so the sender knows which
+      // was just added (if they care)
 			Todo.find(function(err, todos) {
 				if (err)
 					res.send(err)
-				res.json(todos);
+				res.json({todo, todos});
 			});
 		});
 
@@ -171,6 +174,20 @@
 			});
 		});
   });
+
+  // delay a specific number of milliseconds before responding.
+  app.get('/delay/:ms', function (req, res) {
+    show && console.log(req.headers)
+    let start = mstime()
+    let delay = (+req.params.ms) || 0
+    // respond after the delay.
+    setTimeout(function() {
+      res.json({
+        requestedDelay: delay,
+        actualDelay: mstime() - start
+      })
+    }, delay)
+  })
 
   // do a transaction to another server
   app.get('/downstream/:url', function (req, res) {
