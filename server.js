@@ -189,6 +189,17 @@
     }, delay)
   })
 
+  // generate an error response code
+  app.get('/error/:code', function (req, res) {
+    show && console.log(req.headers)
+    let status = req.params.code ? +req.params.code : ''
+    if (status) {
+      res.status(status).send('here is your code: ' + status + '\n')
+    } else {
+      res.send('no code')
+    }
+  })
+
   // do a transaction to another server
   app.get('/downstream/:url', function (req, res) {
     show && console.log(req.headers)
