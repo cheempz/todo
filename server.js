@@ -24,7 +24,6 @@
 
     // set up ========================
   var ao = require('appoptics');
-  ao.sampleMode = 'always';
 	var express  = require('express');
 	var app      = express(); 								// create our app w/ express
 	var mongoose = require('mongoose'); 					// mongoose for mongodb
@@ -34,6 +33,12 @@
   var argv = require('optimist').argv;
   var http = require('http')
   var url = require('url')
+
+  ao.sampleMode = 'always';
+  ao.probes.express.makeMetricsName = function (req, res) {
+    // controller action format
+    return req.route.path + ' bruce'
+  }
 
   const mstime = () => new Date().getTime()
   //
