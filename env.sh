@@ -30,6 +30,8 @@ elif [[ "$ARG" = "java" ]]; then
         # used by docker-compose
         export TODO_COLLECTOR=java-collector:12222
         export TODO_TRUSTEDPATH=/todo/certs/java-collector.crt
+    else
+        echo Invalid parameter "$PARAM" for argument "java"
     fi
 elif [[ "$ARG" = "scribe" ]]; then
     echo "setting environment variables for standard scribe-collector"
@@ -42,6 +44,8 @@ elif [[ "$ARG" = "scribe" ]]; then
         # used by docker-compose
         export TODO_COLLECTOR=scribe-collector:4444
         export TODO_TRUSTEDPATH=/todo/certs/scribe-collector.crt
+    else
+        echo Invalid parameter "$PARAM" for argument "scribe"
     fi
 elif [[ "$ARG" = "stg" ]]; then
     echo "setting stg environment variables"
@@ -49,6 +53,7 @@ elif [[ "$ARG" = "stg" ]]; then
     export APPOPTICS_COLLECTOR=collector-stg.appoptics.com
     unset APPOPTICS_TRUSTEDPATH
     unset TODO_TRUSTEDPATH
+    unset TODO_COLLECTOR
 elif [[ "$ARG" = "prod" ]]; then
     echo "ERROR: prod is not yet implemented"
 elif [[ "$ARG" = "bindings" ]]; then
