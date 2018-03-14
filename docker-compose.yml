@@ -31,8 +31,9 @@ services:
         # - APPOPTICS_TRUSTEDPATH={AO_COLLECTOR_CERT:-test/certs/java-collector.crt}
 
         # staging collector - depends on $AO_TOKEN_STG being valid
-        - APPOPTICS_COLLECTOR=collector-stg.appoptics.com
+        - APPOPTICS_COLLECTOR=${TODO_COLLECTOR:-collector-stg.appoptics.com}
         - APPOPTICS_REPORTER=ssl
+        - TODO_TRUSTEDPATH
 
         # set the backend (mongodb) address to use
         - TODO_MONGODB_ADDRESS=mongo_2_4:27017
@@ -43,9 +44,9 @@ services:
         # and reinstall the application
         - TODO_REINSTALL
     image: todo-web-aaa
-    #volumes:
-      # map the directory this file is in to the todo directory
-      # - "${PWD}:/home/node/todo/"
+    volumes:
+      # map the certs
+      - ./test/certs:/todo/certs/:ro
     logging:
       options:
         max-file: "1"
@@ -62,7 +63,7 @@ services:
         - TODO_SERVICE_KEY=${AO_TOKEN_STG}:web-bbb
 
         - APPOPTICS_DEBUG_LEVEL=${APPOPTICS_DEBUG_LEVEL:-2}
-        - APPOPTICS_COLLECTOR=collector-stg.appoptics.com
+        - APPOPTICS_COLLECTOR=${TODO_COLLECTOR:-collector-stg.appoptics.com}
         - APPOPTICS_REPORTER=ssl
 
         # set the backend (mongodb) address to use
@@ -70,9 +71,9 @@ services:
         - TODO_REFETCH
         - TODO_REINSTALL
     image: todo-web-bbb
-    #volumes:
-      # map the directory this file is in to the todo directory
-      # - "${PWD}:/home/node/todo/"
+    volumes:
+      # map the certs
+      - ./test/certs:/todo/certs/:ro
     logging:
       options:
         max-file: "1"
@@ -89,7 +90,7 @@ services:
         - TODO_SERVICE_KEY=${AO_TOKEN_STG}:web-ccc
 
         - APPOPTICS_DEBUG_LEVEL=${APPOPTICS_DEBUG_LEVEL:-2}
-        - APPOPTICS_COLLECTOR=collector-stg.appoptics.com
+        - APPOPTICS_COLLECTOR=${TODO_COLLECTOR:-collector-stg.appoptics.com}
         - APPOPTICS_REPORTER=ssl
 
         # set the backend (mongodb) address to use
@@ -98,13 +99,25 @@ services:
         - TODO_REFETCH
         - TODO_REINSTALL
     image: todo-web-ccc
-    #volumes:
-      # map the directory this file is in to the todo directory
-      # - "${PWD}:/home/node/todo/"
+    volumes:
+      # map the certs
+      - ./test/certs:/todo/certs/:ro
     logging:
       options:
         max-file: "1"
         max-size: 50m
+
+  # extend the collector services into this composition.
+  # NOTE: extend goes away in version 3.0 of docker-compose.yml
+  #
+  scribe-collector:
+    extends:
+      file: "../oboe-test/collectors/docker-compose.yml"
+      service: "scribe-collector"
+  java-collector:
+    extends:
+      file: "../oboe-test/collectors/docker-compose.yml"
+      service: "java-collector"
 
   mongo_2_4:
     image: "mongo_2_4"

@@ -1,4 +1,5 @@
 ARG=$1
+PARAM=$2
 
 if [[ -z "$AO_TOKEN_STG" ]]; then
     echo "AO_TOKEN_STG must be defined and contain a valid token"
@@ -20,22 +21,34 @@ if [[ -z "$ARG" ]]; then
     echo
 elif [[ "$ARG" = "java" ]]; then
     echo "setting environment variables for standard java-collector"
-    echo "N.B. presumes ../oboe-test/collectors/java-collector/test-collector.crt"
-    export APPOPTICS_REPORTER=ssl
-    export APPOPTICS_COLLECTOR=localhost:12222
-    export APPOPTICS_TRUSTEDPATH=../oboe-test/collectors/java-collector/test-collector.crt
+    if [[ -z "$PARAM" ]]; then
+        export APPOPTICS_REPORTER=ssl
+        export APPOPTICS_COLLECTOR=localhost:12222
+        export APPOPTICS_TRUSTEDPATH=./test/certs/java-collector.crt
+        unset TODO_TRUSTEDPATH
+    elif [[ "$PARAM" = "docker" ]]; then
+        # used by docker-compose
+        export TODO_COLLECTOR=java-collector:12222
+        export TODO_TRUSTEDPATH=/todo/certs/java-collector.crt
+    fi
 elif [[ "$ARG" = "scribe" ]]; then
     echo "setting environment variables for standard scribe-collector"
-    echo "N.B. presumes ../oboe-test/collectors/scribe-collector/test-collector.crt"
-    echo "WARNING - scribe has cert problems, not functional"
-    export APPOPTICS_REPORTER=ssl
-    export APPOPTICS_COLLECTOR=localhost:4444
-    export APPOPTICS_TRUSTEDPATH=../oboe-test/collectors/scribe-collector/ca.crt
+    if [[ -z "$PARAM" ]]; then
+        export APPOPTICS_REPORTER=ssl
+        export APPOPTICS_COLLECTOR=localhost:4444
+        export APPOPTICS_TRUSTEDPATH=./test/certs/scribe-collector.crt
+        unset TODO_TRUSTEDPATH
+    elif [[ "$PARAM" = "docker" ]]; then
+        # used by docker-compose
+        export TODO_COLLECTOR=scribe-collector:4444
+        export TODO_TRUSTEDPATH=/todo/certs/scribe-collector.crt
+    fi
 elif [[ "$ARG" = "stg" ]]; then
     echo "setting stg environment variables"
     export APPOPTICS_REPORTER=ssl
     export APPOPTICS_COLLECTOR=collector-stg.appoptics.com
     unset APPOPTICS_TRUSTEDPATH
+    unset TODO_TRUSTEDPATH
 elif [[ "$ARG" = "prod" ]]; then
     echo "ERROR: prod is not yet implemented"
 elif [[ "$ARG" = "bindings" ]]; then
