@@ -1,3 +1,4 @@
+'use strict'
 /**
  * @license
  * Everything in this repo is MIT License unless otherwise specified.
@@ -36,8 +37,10 @@
 
   ao.sampleMode = 'always';
   ao.probes.express.makeMetricsName = function (req, res) {
-    // controller action format
-    return req.route.path + ' bruce'
+    return {
+      Controller: 'todomvc',
+      Action: req.method + req.route.path
+    }
   }
 
   const mstime = () => new Date().getTime()
