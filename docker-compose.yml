@@ -119,6 +119,17 @@ services:
       file: "../oboe-test/collectors/docker-compose.yml"
       service: "java-collector"
 
+  logalyzer:
+    build:
+      context: test/docker
+      dockerfile: logalyzer.yml
+    image: logalyzer
+    logging:
+      options:
+        max-file: "1"
+        max-size: 50m
+
+
   mongo_2_4:
     image: "mongo_2_4"
     build:

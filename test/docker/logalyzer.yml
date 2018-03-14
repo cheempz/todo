@@ -1,0 +1,30 @@
+# Use to build bmacnaughton/appoptics-node-test-main image
+# used by test/main.yml.
+#FROM node:4
+FROM ubuntu:16.04
+
+# remove cache at end to reduce image size
+RUN apt-get update && apt-get -y install gcc-4.9 g++-4.9 \
+  software-properties-common \
+  python-software-properties \
+  build-essential \
+  curl \
+  git \
+  wget \
+  unzip \
+  libpq-dev \
+  libkrb5-dev \
+  tcpdump \
+&& rm -rf /var/lib/apt/lists/*
+
+# HACK around https://github.com/dotcloud/docker/issues/5490
+RUN mv /usr/sbin/tcpdump /usr/bin/tcpdump
+
+# get node
+RUN curl -sL https://deb.nodesource.com/setup_4.x | bash -
+RUN apt-get install -y nodejs
+
+# execute an interval timer once every 10 seconds to keep the foreground
+# process alive.
+#CMD ["node", "-e", "setInterval(function() {}, 10000)"]
+CMD ["tcpdump", "-i", "lo", "-n", "udp", "port", "7831"]
