@@ -4,7 +4,6 @@ const axios = require('axios')
 const randomstring = require('randomstring')
 const argv = require('minimist')(process.argv)
 
-
 if (argv.h || argv.help) {
   console.log('usage: node multitest.js')
   console.log('    options:')
@@ -48,25 +47,24 @@ let addTime = 0     // ms to complete the transactions
 let delTime = 0
 
 const rd = n => n.toFixed(2)
-let writeStatsLine = function () {
+let makeAddDeleteStatsLine = function () {
   let et = (mstime() - startTime) / 1000
   let prefix = 'et: ' + et.toFixed(0)
   let addText = 'added:' + addCount + '(' + rd(addCount/et) + '/sec)'
   let delText = 'deleted:' + delCount + '(' + rd(delCount/et) + '/sec)'
   let sampledText = 'sampled a:' + addsSampled + ', d:' + delsSampled
-  process.stdout.write(prefix + ' ' + addText + ', ' + delText + ', ' + sampledText)
+  return prefix + ' ' + addText + ', ' + delText + ', ' + sampledText
 }
 let outputStats
 if (process.stdout.isTTY) {
-  outputStats = function () {
+  outputStats = function (getLine) {
     process.stdout.clearLine()
     process.stdout.cursorTo(0)
-    writeStatsLine()
+    process.stdout.write(getLine())
   }
 } else {
-  outputStats = function () {
-    writeStatsLine()
-    process.stdout.write('\n')
+  outputStats = function (getLine) {
+    process.stdout.write(getLine() + '\n')
   }
 }
 
@@ -150,14 +148,14 @@ function makeAddDeletePair (addInterval, delInterval) {
       if (r.headers['x-trace'] && r.headers['x-trace'].substr(-2) === '01') {
         addsSampled += 1
       }
-      outputStats()
+      outputStats(writeAddDeleteStatsLine)
 
       return executeDelete(delInterval, r.data.todo).then(r => {
         delCount += 1
         if (r.headers['x-trace'] && r.headers['x-trace'].substr(-2) === '01') {
           delsSampled += 1
         }
-        outputStats()
+        outputStats(writeAddDeleteStatsLine)
         return r
       })
     }).catch(e => {
@@ -168,7 +166,10 @@ function makeAddDeletePair (addInterval, delInterval) {
 
 function executeDelay (interval, msDelay) {
   return wait(interval).then(() => {
-    return axios.get(delayUrl + msDelay, options).then(r => r)
+    var start = mstime()
+    return axios.get(delayUrl + msDelay, options).then(r => {
+      return {serverDelay: r.data.actualDelay, totalDelay: mstime() - start}
+    })
   })
 }
 
@@ -201,8 +202,22 @@ startTime = mstime()
 if (transaction === 'delay') {
   // just make the delayed calls.
   // TODO BAM consider adjusting interval for delay in transaction?
+  var delayCalls = 0
+  var totalServerDelay = 0
+  var totalDelay = 0
   let iid = setInterval(function () {
-    executeDelay(0, +argv.delay).then(r => console.log(r.data))
+    executeDelay(0, +argv.delay).then(r => {
+      delayCalls += 1
+      totalServerDelay += r.serverDelay
+      totalDelay += r.totalDelay
+      var makeLine = () => [
+        'n: ', delayCalls,
+        ', delay (tot, server) avg (',
+        rd(totalDelay/delayCalls), ', ', rd(totalServerDelay/delayCalls),
+        ') last (', r.totalDelay, ', ', r.serverDelay, ')'
+      ].join('')
+      outputStats(makeLine)
+    })
   }, interval / transactionsPerInterval)
 } else {
   // start an add/delete pair immediately then let the delays kick in.
