@@ -148,14 +148,14 @@ function makeAddDeletePair (addInterval, delInterval) {
       if (r.headers['x-trace'] && r.headers['x-trace'].substr(-2) === '01') {
         addsSampled += 1
       }
-      outputStats(writeAddDeleteStatsLine)
+      outputStats(makeAddDeleteStatsLine)
 
       return executeDelete(delInterval, r.data.todo).then(r => {
         delCount += 1
         if (r.headers['x-trace'] && r.headers['x-trace'].substr(-2) === '01') {
           delsSampled += 1
         }
-        outputStats(writeAddDeleteStatsLine)
+        outputStats(makeAddDeleteStatsLine)
         return r
       })
     }).catch(e => {
