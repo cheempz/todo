@@ -4,21 +4,44 @@ const axios = require('axios')
 const randomstring = require('randomstring')
 const argv = require('minimist')(process.argv)
 
-if (argv.h || argv.help) {
-  console.log('usage: node multitest.js')
-  console.log('    options:')
-  console.log('        -i <interval in seconds>')
-  console.log('        -n <add/delete pairs per interval')
-  console.log('        --ws_ip=host[:port] todo server to connect to')
-  console.log('        --delete delete existing todos before starting')
-  console.log('        --delay=<ms> perform delayed url fetches, not add/deletes')
-  console.log()
-  process.exit(0)
+const validActions = {
+  'add-delete': actionAddDelete,
+  'ad': actionAddDelete,
+  delay: actionDelay
 }
 
 // params
 let int = argv.i || 5         // interval in seconds
 let nPerInt = argv.n || 5     // number of adds/delete pairs per interval
+let delay = 'delay' in argv ? +argv.delay : 1500
+
+// get action to perform n times per i
+let action = argv.action || 'add-delete'
+if (argv.a) action = argv.a
+
+if (!(action in validActions)) {
+  console.warn('invalid action: "%s"', action)
+}
+
+// if not good this will cause help to be displayed then process exit.
+action = validActions[action]
+
+if (!action || argv.h || argv.help) {
+  console.log('usage: node multitest.js')
+  console.log('    options:')
+  console.log('        --action={add-delete|ad|delay}')
+  console.log('        -a synonym for --action')
+  console.log('        -i <interval in seconds>')
+  console.log('        -n <add/delete pairs per interval')
+  console.log('        --ws_ip=host[:port] todo server to connect to')
+  console.log('        --delete delete existing todos before starting')
+  console.log('        --delay=<ms> delay time for action=delay (default 1500)')
+  console.log()
+  process.exit(0)
+}
+
+
+
 
 //
 // new timer-based distribution of transactions
@@ -164,6 +187,29 @@ function makeAddDeletePair (addInterval, delInterval) {
   }
 }
 
+//
+// stats for makeDelay
+var delayCalls = 0
+var totalServerDelay = 0
+var totalDelay = 0
+
+function makeDelay (interval, msDelay) {
+  return function () {
+    return executeDelay(interval, msDelay).then(r => {
+      delayCalls += 1
+      totalServerDelay += r.serverDelay
+      totalDelay += r.totalDelay
+      var makeLine = () => [
+        'n: ', delayCalls,
+        ', delay (tot, server) avg (',
+        rd(totalDelay / delayCalls), ', ', rd(totalServerDelay / delayCalls),
+        ') last (', r.totalDelay, ', ', r.serverDelay, ')'
+      ].join('')
+      outputStats(makeLine)
+    })
+  }
+}
+
 function executeDelay (interval, msDelay) {
   return wait(interval).then(() => {
     var start = mstime()
@@ -198,6 +244,55 @@ if (argv.delete) {
 }
 
 startTime = mstime()
+
+function actionAddDelete () {
+  // start an add/delete pair immediately then let the delays kick in. this
+  // provides quick visual feedback.
+  makeAddDeletePair(0, getDelay())()
+
+  // start additional add/delete pairs on interval
+  let iid = setInterval(function () {
+    makeAddDeletePair(getDelay(interval), getDelay(interval))()
+  }, interval / transactionsPerInterval)
+}
+
+function actionDelay () {
+
+  makeDelay(0, delay)()
+
+  let iid = setInterval(function () {
+    makeDelay(getDelay(interval), delay)()
+  }, interval / transactionsPerInterval)
+
+  return
+  // NEVER GETS HERE NOW
+
+  // TODO NEED ERROR HANDLING...
+  // just make the delayed calls.
+  // TODO BAM consider adjusting interval for delay in transaction?
+  var delayCalls = 0
+  var totalServerDelay = 0
+  var totalDelay = 0
+  let xiid = setInterval(function () {
+    executeDelay(0, +argv.delay).then(r => {
+      delayCalls += 1
+      totalServerDelay += r.serverDelay
+      totalDelay += r.totalDelay
+      var makeLine = () => [
+        'n: ', delayCalls,
+        ', delay (tot, server) avg (',
+        rd(totalDelay / delayCalls), ', ', rd(totalServerDelay / delayCalls),
+        ') last (', r.totalDelay, ', ', r.serverDelay, ')'
+      ].join('')
+      outputStats(makeLine)
+    })
+  }, interval / transactionsPerInterval)
+}
+
+// execute the action
+action()
+
+return
 
 if (transaction === 'delay') {
   // just make the delayed calls.
