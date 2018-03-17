@@ -46,6 +46,7 @@ ENV APPOPTICS_SERVICE_KEY ${TODO_SERVICE_KEY}
 ENV APPOPTICS_DEBUG_LEVEL=$APPOPTICS_DEBUG_LEVEL
 ENV DEBUG=${TODO_DEBUG:-appoptics:error,appoptics:warn,appoptics:debug}
 
-CMD ["/bin/bash", "-c", "cd $HOME/todo && source ~/.nvm/nvm.sh && node server --be_ip=${TODO_MONGODB_ADDRESS} -r 100 ${TODO_SERVER_OPTIONS}"]
+# set using --rate. server will override --rate with -r, if set in TODO_SERVER_OPTIONS
+CMD ["/bin/bash", "-c", "cd $HOME/todo && source ~/.nvm/nvm.sh && node server --be_ip=${TODO_MONGODB_ADDRESS} --rate 1000000 ${TODO_SERVER_OPTIONS}"]
 
 
