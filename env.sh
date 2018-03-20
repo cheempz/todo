@@ -67,11 +67,15 @@ elif [[ "$ARG" = "bindings" ]]; then
     # this requires that one's git access token is already defined.
     export AO_TEST_GITAUTH=${AO_TOKEN_GIT}
 
+elif [[ "$ARG" = "truncate" ]]; then
+    log=$(docker inspect -f '{{.LogPath}}' ${PARAM} 2> /dev/null)
+    sudo truncate -s 0 $log
+
 elif [[ "$ARG" = "debug" ]]; then
     # docker debugging helpers
     # (truncate log)
     # log=$(docker inspect -f '{{.LogPath}}' ${container-name} 2> /dev/null)
-    # truncate -s 0 $log
+    # sudo truncate -s 0 $log
     # (view environment for container)
     # docker inspect -f '{{ json .Config.Env}}' todo-web-aaa
     echo "setting debug environment variables to standard"
