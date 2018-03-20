@@ -50,7 +50,19 @@ var argv = require('optimist').argv;
 var http = require('http')
 var url = require('url')
 
-ao.sampleMode = 'always';
+var modeMap = {
+  0: 0,
+  1: 1,
+  never: 0,
+  always: 1
+}
+if ('sampleMode' in argv) {
+  ao.sampleMode = modeMap[argv.sampleMode]
+}
+
+// experimental extension to make a custom transaction name. Not sure that
+// req, res are available for all places this might be called, but it's a
+// start - works for http and express.
 ao.probes.express.makeMetricsName = function (req, res) {
   return {
     Controller: 'todomvc',
@@ -60,35 +72,44 @@ ao.probes.express.makeMetricsName = function (req, res) {
 
 const mstime = () => new Date().getTime()
 //
-// configuration and options =================
+// configuration and command line options =================
 //
 
+//
 // mongo DB
+//
 var mongoHost = typeof argv.be_ip === 'string' ? argv.be_ip : '127.0.0.1:27017'
 if (!~mongoHost.indexOf(':')) mongoHost += ':27017'
 
-
-var mOpts = {
+var mongoOpts = {
   reconnectTries: 10,
   reconnectInterval: 2000
 }
 
-mongoose.connect('mongodb://' + mongoHost + '/my_database', mOpts)
+mongoose.connect('mongodb://' + mongoHost + '/my_database', mongoOpts)
 
+//
 // web server
+//
 var webServerHost = argv.fe_ip || '0.0.0.0:8088'
 if (!~webServerHost.indexOf(':')) webServerHost += ':8088'
-
-var rate = 'rate' in argv ? +argv.rate : 1000000
-// also allow shorthand -r which does 0-100 (for percents)
-if ('r' in argv) rate = +argv.r * 10000
-ao.sampleRate = rate
 
 // log headers to console
 var show = argv.s || argv['show-headers']
 
 // host to log requests to. don't log if not present
 var logHost = argv.log_ip || ''
+
+//
+// appoptics settings
+//
+var rate = 'rate' in argv ? +argv.rate : 1000000
+
+// also allow shorthand -r which does 0-100 (interpreted as percent)
+// this overrides a --rate setting.
+if ('r' in argv) rate = +argv.r * 10000
+ao.sampleRate = rate
+
 
 //
 // app configuration ===============
@@ -197,6 +218,18 @@ app.delete('/api/todos/:todo_id', function (req, res) {
     });
   });
 });
+
+// function so client can get appoptics configuration
+app.get('/config', function (req, res) {
+  show && console.log(req.headers)
+  res.json({
+    appoptics: !ao.dummy,
+    bindings: !!ao.addon,
+    serviceKey: process.env.APPOPTICS_SERVICE_KEY || '<not present>',
+    sampleRate: ao.sampleRate,
+    sampleMode: ao.sampleMode ? ao.sampledMode : 'unset'
+  })
+})
 
 // delay a specific number of milliseconds before responding.
 app.get('/delay/:ms', function (req, res) {
@@ -333,7 +366,7 @@ console.log('todo-tester listening on', webServerHost, https, text)
 if (ao.dummy) {
   console.warn('AppOptics not found - executing normally')
 } else if (ao.addon) {
-  console.log('AppOptics loaded - sample rate', ao.sampleRate)
+  console.log('AppOptics loaded - sample rate', ao.sampleRate, 'sampleMode', ao.sampleMode)
 } else {
   console.error('AppOptics in disabled mode - addon not present')
 }
