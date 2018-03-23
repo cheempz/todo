@@ -28,7 +28,7 @@
 var ao
 
 try {
-  ao = require('appoptics')
+  ao = require('appoptics-apm')
 } catch (e) {
   // make a skeletal ao so references in the code will work
   // when it isn't loaded.
@@ -111,6 +111,8 @@ if ('r' in argv) rate = +argv.r * 10000
 ao.sampleRate = rate
 
 
+var pid = process.pid
+
 //
 // app configuration ===============
 //
@@ -163,8 +165,12 @@ app.get('/api/todos', function(req, res) {
   });
 });
 
+var active = 0
+
 // create todo and send back all todos after creation
 app.post('/api/todos', function(req, res) {
+  active += 1
+  console.log('active', active)
   show && console.log(req.headers)
 
   // create a todo, information comes from AJAX request from Angular
@@ -172,13 +178,16 @@ app.post('/api/todos', function(req, res) {
     title : req.body.title,
     completed : false
   }, function(err, todo) {
+    active -= 1
     if (err)
       res.send(err);
 
     // get and return all the todos after you create another
     // also return the specific todo so the sender knows which
     // was just added (if they care)
+    active += 1
     Todo.find(function(err, todos) {
+      active -= 1
       if (err)
         res.send(err)
       res.json({todo, todos});
@@ -203,15 +212,20 @@ app.put('/api/todos/:todo_id', function (req, res) {
 
 // delete a todo
 app.delete('/api/todos/:todo_id', function (req, res) {
+  active += 1
+  console.log('active', active)
   show && console.log(req.headers)
   Todo.remove({
     _id : req.params.todo_id
   }, function(err, todo) {
+    active -= 1
     if (err)
       res.send(err);
 
     // get and return all the todos after you create another
+    active += 1
     Todo.find(function(err, todos) {
+      active -= 1
       if (err)
         res.send(err)
       res.json(todos);
@@ -227,7 +241,45 @@ app.get('/config', function (req, res) {
     bindings: !!ao.addon,
     serviceKey: process.env.APPOPTICS_SERVICE_KEY || '<not present>',
     sampleRate: ao.sampleRate,
-    sampleMode: ao.sampleMode ? ao.sampledMode : 'unset'
+    sampleMode: (ao.sampleMode !== undefined) ? ao.sampleMode : 'unset',
+    pid: pid
+  })
+})
+
+// function so client can set sampleRate and sampleMode
+app.put('/config/:setting/:value', function (req, res) {
+  show && console.log(req.headers)
+
+  if (req.params.setting !== 'sample-rate' && req.params.setting !== 'sample-mode') {
+    res.statusCode = 404
+    res.json({error: 404, message: 'Invalid setting: ' + req.params.setting})
+  }
+
+  if (req.params.setting === 'sample-rate') {
+    ao.sampleRate = +req.params.value
+    if (ao.sampleRate !== +req.params.value) {
+      res.statusCode = 422
+      res.json({
+        error: 422,
+        message: 'invalid rate ' + req.params.value,
+        sampleRate: ao.sampleRate
+      })
+    }
+  } else if (req.params.setting === 'sample-mode') {
+    ao.sampleMode = +req.params.value
+    if (ao.sampleMode !== +req.params.value) {
+      res.statusCode = 422
+      res.json({
+        error: 422,
+        message: 'invalid mode ' + req.params.value,
+        sampleMode: ao.sampleMode
+      })
+    }
+  }
+
+  res.json({
+    sampleRate: ao.sampleRate,
+    sampleMode: ao.sampleMode
   })
 })
 
