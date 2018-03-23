@@ -68,6 +68,7 @@ elif [[ "$ARG" = "bindings" ]]; then
     export AO_TEST_GITAUTH=${AO_TOKEN_GIT}
 
 elif [[ "$ARG" = "truncate" ]]; then
+    # no error checking here...
     log=$(docker inspect -f '{{.LogPath}}' ${PARAM} 2> /dev/null)
     sudo truncate -s 0 $log
 
