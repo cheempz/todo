@@ -40,6 +40,7 @@ try {
     }
   }
 }
+var memwatch = require('memwatch-next')
 var express  = require('express');
 var app      = express(); 								// create our app w/ express
 var mongoose = require('mongoose'); 					// mongoose for mongodb
@@ -49,6 +50,34 @@ var methodOverride = require('method-override'); // simulate DELETE and PUT (exp
 var argv = require('optimist').argv;
 var http = require('http')
 var url = require('url')
+
+
+// memwatch setup
+var leakDetected = 0
+var leakInfo
+var leakTime
+var lastLeakInfo
+var lastLeakTime
+
+memwatch.on('stats', function (stats) {
+  console.log(new Date(), stats)
+  if (leakDetected) {
+    console.log('total leak events', leakDetected)
+    console.log('original leak', leakTime, leakInfo)
+    console.log('last leak', lastLeakTime, lastLeakInfo)
+  }
+})
+
+memwatch.on('leak', function (info) {
+  if (!leakDetected) {
+    leakInfo = info
+    leakTime = new Date()
+  }
+  lastLeakInfo = info
+  lastLeakTime = new Date()
+  leakDetected += 1
+  console.log('LEAK detected count', leakDetected, new Date(), info)
+})
 
 var modeMap = {
   0: 0,
@@ -103,7 +132,7 @@ var logHost = argv.log_ip || ''
 //
 // appoptics settings
 //
-var rate = 'rate' in argv ? +argv.rate : 1000000
+var rate = ('rate' in argv) ? +argv.rate : 1000000
 
 // also allow shorthand -r which does 0-100 (interpreted as percent)
 // this overrides a --rate setting.
@@ -128,7 +157,9 @@ var options = {
 app.use('/js', express.static(__dirname + '/js'));
 app.use('/bower_components', express.static(__dirname + '/bower_components'));
 // log every request to the console
-app.use(morgan('dev'));
+app.use(morgan('dev', {
+  skip: function (req, res) {return leakDetected}
+}));
 // parse application/x-www-form-urlencoded
 app.use(bodyParser.urlencoded({'extended':'true'}));
 // parse application/json
@@ -170,7 +201,7 @@ var active = 0
 // create todo and send back all todos after creation
 app.post('/api/todos', function(req, res) {
   active += 1
-  console.log('active', active)
+  //console.log('active', active)
   show && console.log(req.headers)
 
   // create a todo, information comes from AJAX request from Angular
@@ -178,14 +209,14 @@ app.post('/api/todos', function(req, res) {
     title : req.body.title,
     completed : false
   }, function(err, todo) {
-    active -= 1
-    if (err)
+    if (err) {
+      active -= 1
       res.send(err);
+    }
 
     // get and return all the todos after you create another
     // also return the specific todo so the sender knows which
     // was just added (if they care)
-    active += 1
     Todo.find(function(err, todos) {
       active -= 1
       if (err)
@@ -213,17 +244,17 @@ app.put('/api/todos/:todo_id', function (req, res) {
 // delete a todo
 app.delete('/api/todos/:todo_id', function (req, res) {
   active += 1
-  console.log('active', active)
+  //console.log('active', active)
   show && console.log(req.headers)
   Todo.remove({
     _id : req.params.todo_id
   }, function(err, todo) {
-    active -= 1
-    if (err)
+    if (err) {
+      active -= 1
       res.send(err);
+    }
 
     // get and return all the todos after you create another
-    active += 1
     Todo.find(function(err, todos) {
       active -= 1
       if (err)
@@ -375,6 +406,7 @@ app.get('/chain', function (req, res) {
     })
     // on end return it along with the headers
     ires.on('end', function () {
+      show && console.log(ires.headers)
       var p = makePrefix(q)
       var h = JSON.stringify(ires.headers)
       res.send(p + h + '\nbody: ' + body + '\n')
