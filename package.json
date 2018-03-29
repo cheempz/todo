@@ -4,11 +4,12 @@
   "main": "server.js",
   "dependencies": {
     "angular": "1.2.22",
-    "appoptics-apm": "^3.5.4",
+    "appoptics-apm": ">4.0.0",
     "axios": "^0.16.2",
     "body-parser": "~1.5.2",
     "express": "~4.7.2",
     "http": "0.0.0",
+    "memwatch-next": "^0.3.0",
     "method-override": "~2.1.2",
     "minimist": "^1.2.0",
     "mongoose": "~3.8.27",
