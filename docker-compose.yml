@@ -33,7 +33,7 @@ services:
         # staging collector - depends on $AO_TOKEN_STG being valid
         - APPOPTICS_COLLECTOR=${TODO_COLLECTOR:-collector-stg.appoptics.com}
         - APPOPTICS_REPORTER=ssl
-        - TODO_TRUSTEDPATH
+        - APPOPTICS_TRUSTEDPATH=${TODO_TRUSTEDPATH}
 
         # set the backend (mongodb) address to use
         - TODO_MONGODB_ADDRESS=mongo_2_4:27017
@@ -65,6 +65,7 @@ services:
         - APPOPTICS_DEBUG_LEVEL=${APPOPTICS_DEBUG_LEVEL:-2}
         - APPOPTICS_COLLECTOR=${TODO_COLLECTOR:-collector-stg.appoptics.com}
         - APPOPTICS_REPORTER=ssl
+        - APPOPTICS_TRUSTEDPATH=${TODO_TRUSTEDPATH}
 
         # set the backend (mongodb) address to use
         - TODO_MONGODB_ADDRESS=mongo_2_4:27017
@@ -92,6 +93,7 @@ services:
         - APPOPTICS_DEBUG_LEVEL=${APPOPTICS_DEBUG_LEVEL:-2}
         - APPOPTICS_COLLECTOR=${TODO_COLLECTOR:-collector-stg.appoptics.com}
         - APPOPTICS_REPORTER=ssl
+        - APPOPTICS_TRUSTEDPATH=${TODO_TRUSTEDPATH}
 
         # set the backend (mongodb) address to use
         - TODO_MONGODB_ADDRESS=mongo_2_4:27017
