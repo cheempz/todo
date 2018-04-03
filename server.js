@@ -50,33 +50,89 @@ var methodOverride = require('method-override'); // simulate DELETE and PUT (exp
 var argv = require('optimist').argv;
 var http = require('http')
 var url = require('url')
+var heapdump = require('heapdump')
+
+var requests = 0
 
 
 // memwatch setup
+var firstStats
+var lastStats
+
 var leakDetected = 0
 var leakInfo
 var leakTime
 var lastLeakInfo
 var lastLeakTime
 
-memwatch.on('stats', function (stats) {
-  console.log(new Date(), stats)
-  if (leakDetected) {
-    console.log('total leak events', leakDetected)
-    console.log('original leak', leakTime, leakInfo)
-    console.log('last leak', lastLeakTime, lastLeakInfo)
+function getRSS () {
+  return {
+    n: requests,
+    ts: new Date().getTime(),
+    rss: process.memoryUsage().rss
   }
-})
+}
 
-memwatch.on('leak', function (info) {
-  if (!leakDetected) {
-    leakInfo = info
-    leakTime = new Date()
+var rssHistory = [getRSS()]
+
+function ObjectData (name, n, fn) {
+  this.name = name
+  this.maxItems = n
+  this.fn = fn
+  this.low = 0
+  this.high = 0
+  this.data = {0: fn()}
+}
+
+ObjectData.prototype.addItem = function () {
+  this.high += 1
+  if (this.high - this.low >= this.maxItems) {
+    delete this.data[this.low]
+    this.low += 1
   }
-  lastLeakInfo = info
-  lastLeakTime = new Date()
-  leakDetected += 1
-  console.log('LEAK detected count', leakDetected, new Date(), info)
+  this.data[this.high] = this.fn()
+}
+
+var events = new ObjectData('events', 5, ao.addon.Event.getEventData)
+var metadatas = new ObjectData('metadatas', 5, ao.addon.Metadata.getMetadataData)
+
+function minutes (n) {
+  return n * 1000 * 60
+}
+
+var memInt = setInterval(function () {
+  rssHistory.push(getRSS())
+  //events.addItem()
+  //metadatas.addItem()
+}, minutes(10))
+
+memwatch.on('stats', function (stats) {
+  if (!firstStats) {
+    firstStats = stats
+    lastStats = stats
+  }
+
+
+  let line = [
+    '\nn ', requests,
+    ', fgc ', stats.num_full_gc,
+    ', igc ', stats.num_inc_gc,
+    ', hc ', stats.heap_compactions,
+    ', heap ', stats.current_base,
+    ', delta ', stats.current_base - firstStats.current_base,
+    ', rss ', process.memoryUsage().rss
+    //'min', stats.min, 'max', stats.max
+  ]
+
+  // add a new item after each garbage collection event.
+  events.addItem()
+  metadatas.addItem()
+
+  console.log(line.join(''))
+  console.log('events\n', events.data)
+  console.log('metadata\n', metadatas.data)
+
+  lastStats = stats
 })
 
 var modeMap = {
@@ -146,7 +202,8 @@ var pid = process.pid
 // app configuration ===============
 //
 
-// taken from appoptics test suite.
+// taken from appoptics test suite. these are not valid for any real
+// servers - only used for local testing.
 var options = {
   key: "-----BEGIN RSA PRIVATE KEY-----\nMIICXQIBAAKBgQCsJU2dO/K3oQEh9wo60VC2ajCZjIudc8cqHl9kKNKwc9lP4Rw9\nKWso/+vHhkp6Cmx6Cshm6Hs00rPgZo9HmY//gcj0zHmNbagpmdvAmOudK8l5Npzd\nQwNROKN8EPoKjlFEBMnZj136gF5YAgEN9ydcLtS2TeLmUG1Y3RR6ADjgaQIDAQAB\nAoGBAJTD9/r1n5/JZ+0uTIzf7tx1kGJh7xW2xFtFvDIWhV0wAJDjfT/t10mrQNtA\n1oP5Fh2xy9YC+tZ/cCtw9kluD93Xhzg1Mz6n3h+ZnvnlMb9E0JCgyCznKSS6fCmb\naBz99pPJoR2JThUmcuVtbIYdasqxcHStYEXJH89Ehr85uqrBAkEA31JgRxeuR/OF\n96NJFeD95RYTDeN6JpxJv10k81TvRCxoOA28Bcv5PwDALFfi/LDya9AfZpeK3Nt3\nAW3+fqkYdQJBAMVV37vFQpfl0fmOIkMcZKFEIDx23KHTjE/ZPi9Wfcg4aeR4Y9vt\nm2f8LTaUs/buyrCLK5HzYcX0dGXdnFHgCaUCQDSc47HcEmNBLD67aWyOJULjgHm1\nLgIKsBU1jI8HY5dcHvGVysZS19XQB3Zq/j8qMPLVhZBWA5Ek41Si5WJR1EECQBru\nTUpi8WOpia51J1fhWBpqIbwevJ2ZMVz0WPg85Y2dpVX42Cf7lWnrkIASaz0X+bF+\nTMPuYzmQ0xHT3LGP0cECQQCqt4PLmzx5KtsooiXI5NVACW12GWP78/6uhY6FHUAF\nnJl51PB0Lz8F4HTuHhr+zUr+P7my7X3b00LPog2ixKiO\n-----END RSA PRIVATE KEY-----",
   cert: "-----BEGIN CERTIFICATE-----\nMIICWDCCAcGgAwIBAgIJAPIHj8StWrbJMA0GCSqGSIb3DQEBCwUAMEUxCzAJBgNV\nBAYTAkFVMRMwEQYDVQQIDApTb21lLVN0YXRlMSEwHwYDVQQKDBhJbnRlcm5ldCBX\naWRnaXRzIFB0eSBMdGQwHhcNMTQwODI3MjM1MzUwWhcNMTQwOTI2MjM1MzUwWjBF\nMQswCQYDVQQGEwJBVTETMBEGA1UECAwKU29tZS1TdGF0ZTEhMB8GA1UECgwYSW50\nZXJuZXQgV2lkZ2l0cyBQdHkgTHRkMIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKB\ngQCsJU2dO/K3oQEh9wo60VC2ajCZjIudc8cqHl9kKNKwc9lP4Rw9KWso/+vHhkp6\nCmx6Cshm6Hs00rPgZo9HmY//gcj0zHmNbagpmdvAmOudK8l5NpzdQwNROKN8EPoK\njlFEBMnZj136gF5YAgEN9ydcLtS2TeLmUG1Y3RR6ADjgaQIDAQABo1AwTjAdBgNV\nHQ4EFgQUTqL/t/yOtpAxKuC9zVm3PnFdRqAwHwYDVR0jBBgwFoAUTqL/t/yOtpAx\nKuC9zVm3PnFdRqAwDAYDVR0TBAUwAwEB/zANBgkqhkiG9w0BAQsFAAOBgQBn1XAm\nAsVdXKr3aiZIgOmw5q+F1lKNl/CHtAPCqwjgntPGhW08WG1ojhCQcNaCp1yfPzpm\niaUwFrgiz+JD+KvxvaBn4pb95A6A3yObADAaAE/ZfbEA397z0RxwTSVU+RFKxzvW\nyICDpugdtxRjkb7I715EjO9R7LkSe5WGzYDp/g==\n-----END CERTIFICATE-----"
@@ -158,7 +215,7 @@ app.use('/js', express.static(__dirname + '/js'));
 app.use('/bower_components', express.static(__dirname + '/bower_components'));
 // log every request to the console
 app.use(morgan('dev', {
-  skip: function (req, res) {return leakDetected}
+  skip: function (req, res) {return true}
 }));
 // parse application/x-www-form-urlencoded
 app.use(bodyParser.urlencoded({'extended':'true'}));
@@ -181,6 +238,10 @@ var Todo = mongoose.model('Todo', {
 //
 
 // api ---------------------------------------------------------------------
+app.all('*', function (req, res, next) {
+  requests += 1
+  next()
+})
 // get all todos
 app.get('/api/todos', function(req, res) {
   show && console.log(req.headers)
@@ -312,6 +373,42 @@ app.put('/config/:setting/:value', function (req, res) {
     sampleRate: ao.sampleRate,
     sampleMode: ao.sampleMode
   })
+})
+
+var heapBase
+
+app.get('/diff/:what', function (req, res) {
+  show && console.log(req.headers)
+
+  if (req.params.what === 'mark') {
+    heapBase = new memwatch.HeapDiff()
+    heapBase.__ao = getRSS()
+    res.send('heap diff baseline set\n')
+  } else if (req.params.what === 'end') {
+    var diff = heapBase.end()
+    diff.rss0 = heapBase.__ao
+    diff.rss1 = getRSS()
+    res.json(diff)
+  } else {
+    res.statusCode = 404
+    res.send()
+  }
+})
+
+app.get('/heapdump', function (req, res) {
+  heapdump.writeSnapshot(function (err, filename) {
+    if (err) {
+      res.statusCode = 400
+      res.send('error writing heapdump', err)
+    }
+    res.send('wrote ' + filename + '\n')
+  })
+})
+
+app.get('/rss', function (req, res) {
+  show && console.log(req.headers)
+
+  res.json(rssHistory)
 })
 
 // delay a specific number of milliseconds before responding.
