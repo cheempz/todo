@@ -101,7 +101,7 @@ function minutes (n) {
 }
 
 var memInt = setInterval(function () {
-  rssHistory.push(getRSS())
+  //rssHistory.push(getRSS())
   //events.addItem()
   //metadatas.addItem()
 }, minutes(10))
@@ -128,9 +128,9 @@ memwatch.on('stats', function (stats) {
   events.addItem()
   metadatas.addItem()
 
-  console.log(line.join(''))
-  console.log('events\n', events.data)
-  console.log('metadata\n', metadatas.data)
+  //console.log(line.join(''))
+  //console.log('events\n', events.data)
+  //console.log('metadata\n', metadatas.data)
 
   lastStats = stats
 })
@@ -219,7 +219,7 @@ app.use('/js', express.static(__dirname + '/js'));
 app.use('/bower_components', express.static(__dirname + '/bower_components'));
 // log every request to the console
 app.use(morgan('dev', {
-  skip: function (req, res) {return true}
+  skip: function (req, res) {return false}
 }));
 // parse application/x-www-form-urlencoded
 app.use(bodyParser.urlencoded({'extended':'true'}));
