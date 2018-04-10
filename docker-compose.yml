@@ -5,6 +5,31 @@
 #
 version: '2.1'
 services:
+  web-leak:
+    ports:
+      - "8013:8088"
+    environment:
+      - TODO_SERVER_OPTIONS=${TODO_SERVER_OPTIONS}
+    build:
+      context: .
+      args:
+        - TODO_SERVICE_KEY=${AO_TOKEN_STG}:web-leak
+        - APPOPTICS_DEBUG_LEVEL=${APPOPTICS_DEBUG_LEVEL:-2}
+        # staging collector - depends on $AO_TOKEN_STG being valid
+        - APPOPTICS_COLLECTOR=${TODO_COLLECTOR:-collector-stg.appoptics.com}
+        - APPOPTICS_REPORTER=ssl
+        - APPOPTICS_TRUSTEDPATH=${TODO_TRUSTEDPATH}
+
+        # set the backend (mongodb) address to use
+        - TODO_MONGODB_ADDRESS=mongo_2_4:27017
+        #
+        # Rebuild starting with fetching the todo application
+        #
+        - TODO_REFETCH
+        # and reinstall the application
+        - TODO_REINSTALL
+        - TODO_TARBALL=https://api.github.com/repos/bmacnaughton/todomvc-mongodb/tarball/leak-detection
+
   web-aaa:
     ports:
       - "8088:8088"
