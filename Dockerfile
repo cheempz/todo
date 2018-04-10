@@ -3,9 +3,11 @@ FROM bmacnaughton/node:2.1.0
 
 # set this to something different to force refetching todo.
 ARG TODO_REFETCH
+ARG TODO_TARBALL
+ENV TARBALL=${TODO_TARBALL:-https://api.github.com/repos/bmacnaughton/todomvc-mongodb/tarball}
 # get the application, extract it, move it, and name the dir todo
 RUN REFETCH=${TODO_REFETCH} cd $HOME && \
-    curl -LkSs https://api.github.com/repos/bmacnaughton/todomvc-mongodb/tarball -o todo.tar.gz && \
+    curl -LkSs $TARBALL -o todo.tar.gz && \
     mkdir -p tmp && tar -zvxf todo.tar.gz -C tmp && \
     mv tmp/$(ls -t tmp/ | head -1) $HOME/todo
 
