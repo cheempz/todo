@@ -27,7 +27,8 @@ elif [[ "$ARG" = "java" ]]; then
         export APPOPTICS_TRUSTEDPATH=./test/certs/java-collector.crt
         unset TODO_TRUSTEDPATH
     elif [[ "$PARAM" = "docker" ]]; then
-        # used by docker-compose
+        # set up environment for docker-compose build to point
+        # appoptics at java-collector in containers
         export TODO_COLLECTOR=java-collector:12222
         export TODO_TRUSTEDPATH=/todo/certs/java-collector.crt
     else
@@ -79,6 +80,10 @@ elif [[ "$ARG" = "debug" ]]; then
     # sudo truncate -s 0 $log
     # (view environment for container)
     # docker inspect -f '{{ json .Config.Env}}' todo-web-aaa
+    # watching memory
+    # watch -n60 'docker stats --no-stream --format "{{.Name}}: {{.MemUsage}}" todo_web-aaa_1  >> todo_web-aaa_1.memory.log'
+    # examine another proc's env - cat /proc/17330/environ | tr \\0 \\n
+    # or xargs --null --max-args=1 echo < /proc/PID/environ
     echo "setting debug environment variables to standard"
     export DEBUG=appoptics:error,appoptics:info,appoptics:debug
     #export APPOPTICS_DEBUG_LEVEL=6
