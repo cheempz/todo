@@ -148,12 +148,16 @@ if ('sampleMode' in argv) {
 // experimental extension to make a custom transaction name. Not sure that
 // req, res are available for all places this might be called, but it's a
 // start - works for http and express.
+//*
 ao.probes.express.makeMetricsName = function (req, res) {
-  return {
+  let name = {
     Controller: 'todomvc',
     Action: req.method + req.route.path
   }
+  //console.log('mmn:', name, req.url, req.originalUrl)
+  return name
 }
+// */
 
 const mstime = () => new Date().getTime()
 //
@@ -307,15 +311,20 @@ app.delete('/api/todos/:todo_id', function (req, res) {
   active += 1
   //console.log('active', active)
   show && console.log(req.headers)
-  Todo.remove({
-    _id : req.params.todo_id
-  }, function(err, todo) {
+  var item = {
+    _id: req.params.todo_id
+  }
+  if (req.params.todo_id === '*') {
+    item = {}
+  }
+  Todo.remove(item, function(err, todo) {
     if (err) {
       active -= 1
-      res.send(err);
+      res.send(err)
     }
 
-    // get and return all the todos after you create another
+    // get and return all the todos (maybe some were created
+    // in the interim?)
     Todo.find(function(err, todos) {
       active -= 1
       if (err)
