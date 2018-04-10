@@ -28,7 +28,7 @@ services:
         - TODO_REFETCH
         # and reinstall the application
         - TODO_REINSTALL
-        - TODO_TARBALL=https://api.github.com/repos/bmacnaughton/todomvc-mongodb/tarball/leak-detection
+        - TODO_TARBALL=https://api.github.com/repos/bmacnaughton/todomvc-mongodb/tarball
 
   web-aaa:
     ports:
