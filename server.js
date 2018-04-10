@@ -539,6 +539,13 @@ app.get('/', function(req, res) {
   res.sendfile('index.html');
 });
 
+app.use(function (req, res) {
+  res.status(404)
+  var body = 'page not found\n'
+  if (req.accepts('json')) body = {error: 'page not found'}
+  res.send(body)
+})
+
 var host = webServerHost.split(':')
 var port = +host[1]
 host = host[0]
