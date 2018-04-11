@@ -60,6 +60,7 @@ if (configuration === 'traceview') {
   }
   ao.addon.Event.getEventData = skeletalAddon.Event.getEventData
   ao.addon.Metadata.getMetadataData = skeletalAddon.Metadata.getMetadataData
+  ao.probes = {express: {}}
 } else if (configuration === 'appoptics' || configuration === '' || configuration === undefined) {
   try {
     ao = require('appoptics-apm')
