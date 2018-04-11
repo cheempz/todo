@@ -45,10 +45,16 @@ var ao = {
 }
 
 var configuration = process.env.AO_BENCHMARK_REQUIRE
+//
+// successfully loading traceview or appoptics-apm will replace ao
+// with with traceview or appoptics, neither of which have a dummyAddon
+// property, so it will be undefined.
+//
 if (configuration === 'traceview') {
   try {
     ao = require('traceview')
     ao.configuration = 'traceview'
+    ao.traceMode = 'always'
   } catch (e) {
     ao.configuration = 'failed-traceview'
   }
@@ -66,7 +72,6 @@ if (configuration === 'traceview') {
   ao.configuration = 'none'
 }
 
-ao.traceMode = 'always'
 
 var memwatch = require('memwatch-next')
 var express  = require('express');
