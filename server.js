@@ -25,6 +25,15 @@
 
 // set up ========================
 
+var skeletalAddon = {
+  Event: {
+    getEventData: function () { return { active: 0, freedBytes: 0, freedCount: 0 } }
+  },
+  Metadata: {
+    getMetadataData: function () { return { active: 0, freedBytes: 0, freedCount: 0 } }
+  }
+}
+
 var ao = {
   configuration: 'none',
   dummyAddon: true,
@@ -32,14 +41,7 @@ var ao = {
   probes: {
     express: {}
   },
-  addon: {
-    Event: {
-      getEventData: function () {return {active: 0, freedBytes: 0, freedCount: 0}}
-    },
-    Metadata: {
-      getMetadataData: function () {return {active: 0, freedBytes: 0, freedCount: 0}}
-    }
-  }
+  addon: skeletalAddon
 }
 
 var configuration = process.env.AO_BENCHMARK_REQUIRE
@@ -50,6 +52,8 @@ if (configuration === 'traceview') {
   } catch (e) {
     ao.configuration = 'failed-traceview'
   }
+  ao.addon.Event.getEventData = skeletalAddon.Event.getEventData
+  ao.addon.Metadata.getMetadataData = skeletalAddon.Metadata.getMetadataData
 } else if (configuration === 'appoptics' || configuration === '' || configuration === undefined) {
   try {
     ao = require('appoptics-apm')
@@ -61,6 +65,8 @@ if (configuration === 'traceview') {
   console.warn('invalid AO_BENCHMARK_REQUIRE', configuration, 'using none')
   ao.configuration = 'none'
 }
+
+ao.traceMode = 'always'
 
 var memwatch = require('memwatch-next')
 var express  = require('express');
@@ -114,7 +120,6 @@ ObjectData.prototype.addItem = function () {
   }
   this.data[this.high] = this.fn()
 }
-
 var events = new ObjectData('events', 5, ao.addon.Event.getEventData)
 var metadatas = new ObjectData('metadatas', 5, ao.addon.Metadata.getMetadataData)
 
