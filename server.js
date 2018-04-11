@@ -25,21 +25,43 @@
 
 // set up ========================
 
-var ao
-
-try {
-  ao = require('appoptics-apm')
-} catch (e) {
-  // make a skeletal ao so references in the code will work
-  // when it isn't loaded.
-  ao = {
-    dummy: true,
-    sampleRate: 0,
-    probes: {
-      express: {}
+var ao = {
+  configuration: 'none',
+  dummyAddon: true,
+  sampleRate: 0,
+  probes: {
+    express: {}
+  },
+  addon: {
+    Event: {
+      getEventData: function () {return {active: 0, freedBytes: 0, freedCount: 0}}
+    },
+    Metadata: {
+      getMetadataData: function () {return {active: 0, freedBytes: 0, freedCount: 0}}
     }
   }
 }
+
+var configuration = process.env.AO_BENCHMARK_REQUIRE
+if (configuration === 'traceview') {
+  try {
+    ao = require('traceview')
+    ao.configuration = 'traceview'
+  } catch (e) {
+    ao.configuration = 'failed-traceview'
+  }
+} else if (configuration === 'appoptics' || configuration === '' || configuration === undefined) {
+  try {
+    ao = require('appoptics-apm')
+    ao.configuration = 'appoptics'
+  } catch (e) {
+    ao.configuration = 'failed-appoptics-apm'
+  }
+} else if (configuration !== 'none') {
+  console.warn('invalid AO_BENCHMARK_REQUIRE', configuration, 'using none')
+  ao.configuration = 'none'
+}
+
 var memwatch = require('memwatch-next')
 var express  = require('express');
 var app      = express(); 								// create our app w/ express
@@ -289,7 +311,6 @@ app.post('/api/todos', function(req, res) {
       res.json({todo, todos});
     });
   });
-
 });
 
 app.put('/api/todos/:todo_id', function (req, res) {
@@ -329,7 +350,7 @@ app.delete('/api/todos/:todo_id', function (req, res) {
       active -= 1
       if (err)
         res.send(err)
-      res.json(todos);
+      res.json(todos)
     });
   });
 });
@@ -338,11 +359,11 @@ app.delete('/api/todos/:todo_id', function (req, res) {
 app.get('/config', function (req, res) {
   show && console.log(req.headers)
   res.json({
-    appoptics: !ao.dummy,
-    bindings: !!ao.addon,
+    configuration: ao.configuration,
+    bindings: ao.dummyAddon ? false : !!ao.addon,
     serviceKey: process.env.APPOPTICS_SERVICE_KEY || '<not present>',
     sampleRate: ao.sampleRate,
-    sampleMode: (ao.sampleMode !== undefined) ? ao.sampleMode : 'unset',
+    sampleMode: (ao.traceMode !== undefined) ? ao.traceMode : 'unset',
     pid: pid
   })
 })
@@ -560,10 +581,13 @@ var tty = require('tty')
 var text = tty.isatty(process.stdout.fd) ? 'on a tty' : 'not a tty'
 var https = httpsPort ? '(https:' + httpsPort + ')' : ''
 console.log('todo-tester listening on', webServerHost, https, text)
-if (ao.dummy) {
-  console.warn('AppOptics not found - executing normally')
-} else if (ao.addon) {
-  console.log('AppOptics loaded - sample rate', ao.sampleRate, 'sampleMode', ao.sampleMode)
+if (ao.configuration === 'none') {
+  console.warn('NO AGENT LOADED - executing normally')
+} else if (ao.configuration === 'traceview') {
+  console.log('TRACEVIEW AGENT loaded')
+} else if (ao.configuration === 'appoptics') {
+  var addon = ao.addon ? 'addon active' : 'but ADDON DISABLED'
+  console.log('APPOPTICS-APM loaded', addon, '- sample rate', ao.sampleRate, 'sampleMode', ao.sampleMode)
 } else {
-  console.error('AppOptics in disabled mode - addon not present')
+  console.error('NO AGENT LOADED', ao.configuration)
 }
