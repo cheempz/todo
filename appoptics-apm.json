@@ -1,0 +1,9 @@
+{
+    "enabled": true,
+    "hostnameAlias": "bruce-alias",
+    "probes": {
+      "fs": {
+        "enabled": true
+      }
+    }
+}
