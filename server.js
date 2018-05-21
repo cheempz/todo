@@ -65,6 +65,9 @@ if (configuration === 'traceview') {
   try {
     ao = require('appoptics-apm')
     ao.configuration = 'appoptics'
+    if (!ao.addon) {
+      ao.addon = skeletalAddon
+    }
   } catch (e) {
     ao.configuration = 'failed-appoptics-apm'
   }
@@ -178,10 +181,21 @@ if ('sampleMode' in argv) {
   ao.sampleMode = modeMap[argv.sampleMode]
 }
 
+ao.setCustomTxNameFunction('express', customExpressTxName)
+
+function customExpressTxName (req, res) {
+  // ignore global routes
+  if (req.route.path === '*') {
+    console.log('ignoring global route')
+    return ''
+  }
+  console.log('req.method', req.method, 'r.r.p', req.route.path, 'url', req.url, 'r.r.m', req.route.methods, 'ourl', req.originalUrl)
+  return 'TODO-' + req.method + req.route.path
+}
 // experimental extension to make a custom transaction name. Not sure that
 // req, res are available for all places this might be called, but it's a
 // start - works for http and express.
-//*
+/* broken as of real implementation 2018/05/15
 ao.probes.express.makeMetricsName = function (req, res) {
   let name = {
     Controller: 'todomvc',
@@ -217,7 +231,7 @@ var webServerHost = argv.fe_ip || '0.0.0.0:8088'
 if (!~webServerHost.indexOf(':')) webServerHost += ':8088'
 
 // log headers to console
-var show = argv.s || argv['show-headers']
+var show = argv.s || argv['show-headers'] || argv.h
 
 // host to log requests to. don't log if not present
 var logHost = argv.log_ip || ''
@@ -301,6 +315,7 @@ app.post('/api/todos', function(req, res) {
   active += 1
   //console.log('active', active)
   show && console.log(req.headers)
+  console.log(res._ao_metrics)
 
   // create a todo, information comes from AJAX request from Angular
   Todo.create({
@@ -324,7 +339,7 @@ app.post('/api/todos', function(req, res) {
   });
 });
 
-app.put('/api/todos/:todo_id', function (req, res) {
+app.put('/api/todos/:todo_id', function todoUpdater (req, res) {
   show && console.log(req.headers)
   return Todo.findById(req.params.todo_id, function(err, todo) {
     todo.title = req.body.title;
@@ -369,6 +384,8 @@ app.delete('/api/todos/:todo_id', function (req, res) {
 // function so client can get appoptics configuration
 app.get('/config', function (req, res) {
   show && console.log(req.headers)
+  show && console.log(req.socket.localPort)
+  debugger
   res.json({
     configuration: ao.configuration,
     bindings: ao.dummyAddon ? false : !!ao.addon,
@@ -514,17 +531,17 @@ app.get('/downstream/:url', function (req, res) {
 
 })
 
+
+function makePrefix(URL) {
+  return '--- response from ' + URL + ' ---\nheaders: '
+}
 //
 // now make a chained URL
 //
 app.get('/chain', function (req, res) {
-  show && console.log(req.headers)
+  show && console.log('chain req headers', req.headers)
 
   var q = req.query.target
-
-  function makePrefix (URL) {
-    return '--- response from ' + URL + ' ---\nheaders: '
-  }
 
   if (!q) {
     res.send('this is the end!\n')
@@ -565,9 +582,40 @@ app.get('/chain', function (req, res) {
 
 })
 
+//
+// version of chain that uses request() instead of
+// http.request()
+//
+app.get('/chain2', function (req, res) {
+  show && console.log('chain2 req headers', req.headers)
+
+  var request = require('request')
+  var options = {
+    url: url.parse(req.query.target),
+    headers: {
+      'user-agent': 'request'
+    }
+  }
+  function callback (err, response, body) {
+    if (!err && response.statusCode === 200) {
+      show && console.log('chain2 callback:', response.headers)
+      var p = makePrefix(req.query.target)
+      var h = JSON.stringify(response.headers)
+      res.send(p + h + '\nbody: ' + body + '\n')
+    }
+  }
+
+  request(options, callback)
+})
+
+
 // application -------------------------------------------------------------
 app.get('/', function(req, res) {
   // load the single view file (angular will handle the page changes on the front-end)
+  show && console.log(req.headers)
+  show && console.log(req.query)
+  show && console.log(req.originalUrl)
+  show && console.log('hostname:', req.hostname)
   res.sendfile('index.html');
 });
 
@@ -597,8 +645,15 @@ if (ao.configuration === 'none') {
 } else if (ao.configuration === 'traceview') {
   console.log('TRACEVIEW AGENT loaded')
 } else if (ao.configuration === 'appoptics') {
-  var addon = ao.addon ? 'addon active' : 'but ADDON DISABLED'
+  var addon
+  if (ao.addon !== skeletalAddon) {
+    addon = 'addon active'
+  } else {
+    addon = 'but DISABLED (no addon)'
+    ao.configuration = 'appoptics-disabled'
+  }
+  var addon = ao.addon !== skeletalAddon ? 'addon active' : 'but DISABLED (no addon)'
   console.log('APPOPTICS-APM loaded', addon, '- sample rate', ao.sampleRate, 'sampleMode', ao.sampleMode)
 } else {
-  console.error('NO AGENT LOADED', ao.configuration)
+  console.error('NO AGENT ACTIVE', ao.configuration)
 }
