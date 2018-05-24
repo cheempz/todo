@@ -56,6 +56,7 @@ if (configuration === 'traceview') {
     ao.configuration = 'traceview'
     ao.traceMode = 'always'
   } catch (e) {
+    console.log(e)
     ao.configuration = 'failed-traceview'
   }
   ao.addon.Event.getEventData = skeletalAddon.Event.getEventData
@@ -87,7 +88,17 @@ var methodOverride = require('method-override'); // simulate DELETE and PUT (exp
 var argv = require('optimist').argv;
 var http = require('http')
 var url = require('url')
+var fs = require('fs')
 var heapdump = require('heapdump')
+
+function clsCheck (msg) {
+  let c = ao.requestStore
+  let ok = c && c.active
+  if (!ok && msg) {
+    console.log('[ERROR] CLS NOT ACTIVE', msg)
+  }
+  return ok
+}
 
 var requests = 0
 
@@ -181,12 +192,13 @@ if ('sampleMode' in argv) {
   ao.sampleMode = modeMap[argv.sampleMode]
 }
 
-ao.setCustomTxNameFunction('express', customExpressTxName)
+if (ao.setCustomTxNameFunction) {
+  ao.setCustomTxNameFunction('express', customExpressTxName)
+}
 
 function customExpressTxName (req, res) {
   // ignore global routes
   if (req.route.path === '*') {
-    console.log('ignoring global route')
     return ''
   }
   console.log('req.method', req.method, 'r.r.p', req.route.path, 'url', req.url, 'r.r.m', req.route.methods, 'ourl', req.originalUrl)
@@ -289,16 +301,19 @@ var Todo = mongoose.model('Todo', {
 //
 
 // api ---------------------------------------------------------------------
-app.all('*', function (req, res, next) {
+app.all('*', function allRoutes (req, res, next) {
+  clsCheck('in globalroute')
   requests += 1
   next()
 })
 // get all todos
-app.get('/api/todos', function(req, res) {
+app.get('/api/todos', function getAllTodos (req, res) {
   show && console.log(req.headers)
+  clsCheck('in app.get before todo.find')
   // use mongoose to get all todos in the database
   Todo.find(function(err, todos) {
-
+    clsCheck('in todo.find cb')
+    var data = fs.readFileSync('package.json', { encoding: 'utf8' })
     // if there is an error retrieving, send the error.
     // nothing after res.send(err) will execute
     if (err)
@@ -311,17 +326,21 @@ app.get('/api/todos', function(req, res) {
 var active = 0
 
 // create todo and send back all todos after creation
-app.post('/api/todos', function(req, res) {
+app.post('/api/todos', function createTodo (req, res) {
   active += 1
   //console.log('active', active)
   show && console.log(req.headers)
   console.log(res._ao_metrics)
+  clsCheck('in post/api/todos')
+
+
 
   // create a todo, information comes from AJAX request from Angular
   Todo.create({
     title : req.body.title,
     completed : false
   }, function(err, todo) {
+    clsCheck('in todo.create cb')
     if (err) {
       active -= 1
       res.send(err);
@@ -339,7 +358,7 @@ app.post('/api/todos', function(req, res) {
   });
 });
 
-app.put('/api/todos/:todo_id', function todoUpdater (req, res) {
+app.put('/api/todos/:todo_id', function updateTodo (req, res) {
   show && console.log(req.headers)
   return Todo.findById(req.params.todo_id, function(err, todo) {
     todo.title = req.body.title;
@@ -354,7 +373,7 @@ app.put('/api/todos/:todo_id', function todoUpdater (req, res) {
 });
 
 // delete a todo
-app.delete('/api/todos/:todo_id', function (req, res) {
+app.delete('/api/todos/:todo_id', function deleteTodo (req, res) {
   active += 1
   //console.log('active', active)
   show && console.log(req.headers)
@@ -364,15 +383,18 @@ app.delete('/api/todos/:todo_id', function (req, res) {
   if (req.params.todo_id === '*') {
     item = {}
   }
+  clsCheck('before todo.remove')
   Todo.remove(item, function(err, todo) {
     if (err) {
       active -= 1
       res.send(err)
     }
+    clsCheck('in todo.remove cb')
 
     // get and return all the todos (maybe some were created
     // in the interim?)
     Todo.find(function(err, todos) {
+      clsCheck('in to.remove cb todo.find cb')
       active -= 1
       if (err)
         res.send(err)
@@ -382,10 +404,10 @@ app.delete('/api/todos/:todo_id', function (req, res) {
 });
 
 // function so client can get appoptics configuration
-app.get('/config', function (req, res) {
+app.get('/config', function getConfig (req, res) {
   show && console.log(req.headers)
   show && console.log(req.socket.localPort)
-  debugger
+
   res.json({
     configuration: ao.configuration,
     bindings: ao.dummyAddon ? false : !!ao.addon,
@@ -397,7 +419,7 @@ app.get('/config', function (req, res) {
 })
 
 // function so client can set sampleRate and sampleMode
-app.put('/config/:setting/:value', function (req, res) {
+app.put('/config/:setting/:value', function updateConfig (req, res) {
   show && console.log(req.headers)
 
   if (req.params.setting !== 'sample-rate' && req.params.setting !== 'sample-mode') {
@@ -435,7 +457,7 @@ app.put('/config/:setting/:value', function (req, res) {
 
 var heapBase
 
-app.get('/diff/:what', function (req, res) {
+app.get('/diff/:what', function heapDiff (req, res) {
   show && console.log(req.headers)
 
   if (req.params.what === 'mark') {
@@ -453,7 +475,7 @@ app.get('/diff/:what', function (req, res) {
   }
 })
 
-app.get('/heapdump', function (req, res) {
+app.get('/heapdump', function heapDump (req, res) {
   heapdump.writeSnapshot(function (err, filename) {
     if (err) {
       res.statusCode = 400
@@ -463,14 +485,14 @@ app.get('/heapdump', function (req, res) {
   })
 })
 
-app.get('/rss', function (req, res) {
+app.get('/rss', function rssHistory (req, res) {
   show && console.log(req.headers)
 
   res.json(rssHistory)
 })
 
 // delay a specific number of milliseconds before responding.
-app.get('/delay/:ms', function (req, res) {
+app.get('/delay/:ms', function delay (req, res) {
   show && console.log(req.headers)
   let start = mstime()
   let delay = (+req.params.ms) || 0
@@ -484,7 +506,7 @@ app.get('/delay/:ms', function (req, res) {
 })
 
 // generate an error response code
-app.get('/error/:code', function (req, res) {
+app.get('/error/:code', function error (req, res) {
   show && console.log(req.headers)
   let status = req.params.code ? +req.params.code : ''
   if (status) {
@@ -495,7 +517,7 @@ app.get('/error/:code', function (req, res) {
 })
 
 // do a transaction to another server
-app.get('/downstream/:url', function (req, res) {
+app.get('/downstream/:url', function downstream (req, res) {
   show && console.log(req.headers)
 
   var options = {
@@ -538,7 +560,7 @@ function makePrefix(URL) {
 //
 // now make a chained URL
 //
-app.get('/chain', function (req, res) {
+app.get('/chain', function chain (req, res) {
   show && console.log('chain req headers', req.headers)
 
   var q = req.query.target
@@ -586,7 +608,7 @@ app.get('/chain', function (req, res) {
 // version of chain that uses request() instead of
 // http.request()
 //
-app.get('/chain2', function (req, res) {
+app.get('/chain2', function chain2 (req, res) {
   show && console.log('chain2 req headers', req.headers)
 
   var request = require('request')
@@ -610,7 +632,7 @@ app.get('/chain2', function (req, res) {
 
 
 // application -------------------------------------------------------------
-app.get('/', function(req, res) {
+app.get('/', function home (req, res) {
   // load the single view file (angular will handle the page changes on the front-end)
   show && console.log(req.headers)
   show && console.log(req.query)
@@ -639,7 +661,10 @@ app.listen(httpsPort).on('error', function (e) {
 var tty = require('tty')
 var text = tty.isatty(process.stdout.fd) ? 'on a tty' : 'not a tty'
 var https = httpsPort ? '(https:' + httpsPort + ')' : ''
-console.log('todo-tester listening on', webServerHost, https, text)
+let line = ['todo-tester listening on', webServerHost, https, text].join(' ')
+let dashes = Buffer.alloc(line.length, '-').toString()
+console.log(dashes)
+console.log(line)
 if (ao.configuration === 'none') {
   console.warn('NO AGENT LOADED - executing normally')
 } else if (ao.configuration === 'traceview') {
@@ -657,3 +682,4 @@ if (ao.configuration === 'none') {
 } else {
   console.error('NO AGENT ACTIVE', ao.configuration)
 }
+console.log(dashes)
