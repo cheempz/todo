@@ -41,7 +41,7 @@ var ao = {
   probes: {
     express: {}
   },
-  addon: skeletalAddon
+  addon: skeletalAddon,
 }
 
 var configuration = process.env.AO_BENCHMARK_REQUIRE
@@ -96,6 +96,8 @@ function clsCheck (msg) {
   let ok = c && c.active
   if (!ok && msg) {
     console.log('[ERROR] CLS NOT ACTIVE', msg)
+  } else if (ok) {
+    console.log('CLS ACTIVE!!!', msg)
   }
   return ok
 }
@@ -199,24 +201,20 @@ if (ao.setCustomTxNameFunction) {
 function customExpressTxName (req, res) {
   // ignore global routes
   if (req.route.path === '*') {
+    console.log('called for * route')
     return ''
   }
   console.log('req.method', req.method, 'r.r.p', req.route.path, 'url', req.url, 'r.r.m', req.route.methods, 'ourl', req.originalUrl)
-  return 'TODO-' + req.method + req.route.path
+  let customTxname = 'TODO-' + req.method + req.route.path
+  console.log('custom name: ', customTxname)
+  return customTxname
 }
-// experimental extension to make a custom transaction name. Not sure that
-// req, res are available for all places this might be called, but it's a
-// start - works for http and express.
-/* broken as of real implementation 2018/05/15
-ao.probes.express.makeMetricsName = function (req, res) {
-  let name = {
-    Controller: 'todomvc',
-    Action: req.method + req.route.path
-  }
-  //console.log('mmn:', name, req.url, req.originalUrl)
-  return name
+
+function wait (n) {
+  return new Promise(function (resolve) {
+    setTimeout(resolve, n)
+  })
 }
-// */
 
 const mstime = () => new Date().getTime()
 //
@@ -455,6 +453,49 @@ app.put('/config/:setting/:value', function updateConfig (req, res) {
   })
 })
 
+app.get('/sdk/:how', function sdk (req, res) {
+  show && console.log(req.headers)
+
+  const s = require('child_process')
+
+
+  if (req.params.how === 'sync') {
+    var p
+    function runSpawnSync () {
+      console.log('runSpawn() invoked')
+      p = s.spawnSync('ls', ['-lR'])
+      console.log('runSpawn() done')
+    }
+    ao.instrument(
+      'todo-sdk-sync-ls',
+      runSpawnSync,
+      {customTxName: 'this-should-not-appear'}
+    )
+    res.send()
+  } else if (req.params.how === 'async') {
+    var p
+    function runExecAsync (cb) {
+      console.log('runExecAsync () invoked')
+      s.exec('ls -lR ./node_modules/appoptics-apm', cb)
+    }
+    ao.instrument(
+      'todo-sdk-async-ls',
+      runExecAsync,
+      {customTxName: 'this-should-not-appear'},
+      function (err, stdout, stderr) {
+        if (err) {
+          res.statusCode = 418
+          console.log(err)
+        }
+        res.send()
+      }
+    )
+  } else {
+    res.statusCode = 404
+    res.send()
+  }
+})
+
 var heapBase
 
 app.get('/diff/:what', function heapDiff (req, res) {
@@ -496,13 +537,19 @@ app.get('/delay/:ms', function delay (req, res) {
   show && console.log(req.headers)
   let start = mstime()
   let delay = (+req.params.ms) || 0
+  clsCheck('in delay (' + delay + ')')
   // respond after the delay.
-  setTimeout(function() {
-    res.json({
-      requestedDelay: delay,
-      actualDelay: mstime() - start
-    })
-  }, delay)
+  wait(delay/2).then(function () {
+    clsCheck('in promise.then()')
+    var data = fs.readFileSync('package.json', { encoding: 'utf8' })
+    setTimeout(function () {
+      clsCheck('in timeout()')
+      res.json({
+        requestedDelay: delay,
+        actualDelay: mstime() - start
+      })
+    }, delay/2)
+  })
 })
 
 // generate an error response code
