@@ -232,7 +232,13 @@ var mongoOpts = {
   reconnectInterval: 2000
 }
 
-mongoose.connect('mongodb://' + mongoHost + '/my_database', mongoOpts)
+//
+// if heroku mode don't look for a mongo server. only a subset
+// of pages are available without error.
+//
+if (!argv.heroku) {
+  mongoose.connect('mongodb://' + mongoHost + '/my_database', mongoOpts)
+}
 
 //
 // web server

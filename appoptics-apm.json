@@ -1,6 +1,7 @@
 {
     "enabled": true,
-    "hostnameAlias": "bruce-alias",
+    "hostnameAlias": "",
+    "domainPrefix": true,
     "probes": {
       "fs": {
         "enabled": true
