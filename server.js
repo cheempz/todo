@@ -701,15 +701,24 @@ app.use(function (req, res) {
   res.send(body)
 })
 
-var host = webServerHost.split(':')
-var port = +host[1]
-host = host[0]
-// hardcode the https port
-var httpsPort = 8443
-app.listen(port, host)
-app.listen(httpsPort).on('error', function (e) {
-  console.log('https disabled:', e.code)
-})
+var port
+var host
+var httpsPort
+if (!argv.heroku) {
+  host = webServerHost.split(':')
+  port = +host[1]
+  host = host[0]
+  // hardcode the https port
+  var httpsPort = 8443
+  app.listen(port, host)
+  app.listen(httpsPort).on('error', function (e) {
+    console.log('https disabled:', e.code)
+    httpsPort = 'N/A'
+  })
+} else {
+  port = process.env.PORT
+  app.listen(port)
+}
 
 var tty = require('tty')
 var text = tty.isatty(process.stdout.fd) ? 'on a tty' : 'not a tty'
