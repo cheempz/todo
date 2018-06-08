@@ -2,6 +2,9 @@
   "name": "todomvc-angular",
   "version": "0.2.2",
   "main": "server.js",
+  "scripts": {
+    "start": "node server.js --heroku"
+  },
   "dependencies": {
     "angular": "1.2.22",
     "appoptics-apm": "4.4.4-rc1",
