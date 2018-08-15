@@ -7,7 +7,7 @@
   },
   "dependencies": {
     "angular": "1.2.22",
-    "appoptics-apm": "4.4.4-rc1",
+    "appoptics-apm": "^5.4.0",
     "axios": "^0.16.2",
     "body-parser": "~1.5.2",
     "express": "~4.7.2",
@@ -20,6 +20,7 @@
     "morgan": "~1.2.2",
     "optimist": "*",
     "randomstring": "^1.1.5",
+    "soap": "^0.24.0",
     "todomvc-common": "~0.1.4"
   },
   "repository": {
