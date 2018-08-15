@@ -90,6 +90,7 @@ var http = require('http')
 var url = require('url')
 var fs = require('fs')
 var heapdump = require('heapdump')
+var soap = require('soap')
 
 function clsCheck (msg) {
   let c = ao.requestStore
@@ -194,7 +195,7 @@ if ('sampleMode' in argv) {
   ao.sampleMode = modeMap[argv.sampleMode]
 }
 
-if (ao.setCustomTxNameFunction) {
+if (ao.setCustomTxNameFunction && (argv.c || argv.custom)) {
   ao.setCustomTxNameFunction('express', customExpressTxName)
 }
 
@@ -232,18 +233,33 @@ var mongoOpts = {
   reconnectInterval: 2000
 }
 
+let mongooseError = null
 //
 // if heroku mode don't look for a mongo server. only a subset
 // of pages are available without error.
 //
 if (!argv.heroku) {
-  mongoose.connect('mongodb://' + mongoHost + '/my_database', mongoOpts)
+  mongoose.connect('mongodb://' + mongoHost + '/my_database', mongoOpts, function (err) {
+    if (err) {
+      console.log('mongoose failed to connect to', mongoHost, err)
+      console.log('\n\nyou may specify the host with the command line option')
+      console.log('be_ip. for example,')
+      console.log('     --be_ip=localhost:27099')
+      process.exit(1)
+      mongooseError = err
+    }
+  })
 }
 
 //
 // web server
 //
-var webServerHost = argv.fe_ip || '0.0.0.0:8088'
+var webServerHost
+if (typeof argv.fe_ip === 'number') {
+  webServerHost = 'localhost:' + argv.fe_ip
+} else {
+  webServerHost = argv.fe_ip || '0.0.0.0:8088'
+}
 if (!~webServerHost.indexOf(':')) webServerHost += ':8088'
 
 // log headers to console
@@ -459,6 +475,51 @@ app.put('/config/:setting/:value', function updateConfig (req, res) {
   })
 })
 
+var wsdlURL = 'http://localhost:3000/wsdl?wsdl'
+
+app.get('/soap/:string', function makeSoapCall (req, res) {
+  soap.createClientAsync(wsdlURL).then(client => {
+    console.log('got soap async client')
+    var args = {
+      message: req.params.string,
+      splitter: ':'
+    }
+    return client.MessageSplitterAsync(args)
+  }).then(result => {
+    console.log('got MessageSplitter result', result)
+    res.send(result)
+  }).catch(err => {
+    console.log('soap - got error', err)
+    res.statusCode = 418
+    res.send('')
+  })
+
+})
+
+
+app.get('/custom-async', function customAsync (req, res) {
+  console.log(req.url)
+  const s = require('child_process')
+
+  var p
+  function runExecAsync(cb) {
+    console.log('runExecAsync () invoked')
+    s.exec('ls -lR ./node_modules/appoptics-apm', cb)
+  }
+  ao.instrument(
+    'todo-custom-async-ls',
+    runExecAsync,
+    {customTxName: 'this-should-not-appear'},
+    function (err, stdout, stderr) {
+      if (err) {
+        res.statusCode = 418
+        console.log(err)
+      }
+      res.send('executed todo-custom-async-ls\n')
+    }
+  )
+})
+
 app.get('/sdk/:how', function sdk (req, res) {
   show && console.log(req.headers)
 
@@ -477,7 +538,7 @@ app.get('/sdk/:how', function sdk (req, res) {
       runSpawnSync,
       {customTxName: 'this-should-not-appear'}
     )
-    res.send()
+    res.send('executed todo-sdk-sync-ls\n')
   } else if (req.params.how === 'async') {
     var p
     function runExecAsync (cb) {
@@ -493,9 +554,43 @@ app.get('/sdk/:how', function sdk (req, res) {
           res.statusCode = 418
           console.log(err)
         }
-        res.send()
+        res.send('executed todo-sdk-async-ls\n')
       }
     )
+  } else if (req.params.how === 'promise') {
+
+    function runPromise (done) {
+      const p = new Promise(runPromiseExec)
+      return p.then(r => {
+        done()
+      })
+    }
+
+    function runPromiseExec (resolve, reject) {
+      function execCallback (err, stdout, stderr) {
+        if (!err) {
+          resolve('success')
+        } else {
+          reject(err)
+        }
+      }
+      s.exec('ls -lR ./node_modules/appoptics-apm', execCallback)
+    }
+
+    ao.instrument(
+      'todo-sdk-promise-ls',
+      runPromise,
+      {customTxName: 'this-should-not-appear'},
+      function (err, stdout, stderr) {
+        if (err) {
+          res.statusCode = 418
+          console.log(err)
+        }
+        res.send('executed todo-sdk-promise-ls\n')
+      }
+    )
+
+
   } else {
     res.statusCode = 404
     res.send()
