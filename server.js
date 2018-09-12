@@ -77,11 +77,21 @@ if (configuration === 'traceview') {
   ao.configuration = 'none'
 }
 
+let aoVersion = 'error'
+let bindingsVersion = 'error'
+if (ao.configuration === 'appoptics') {
+  try {
+    aoVersion = require('appoptics-apm/package.json').version
+    bindingsVersion = require('appoptics-bindings/package.json').version
+  } catch (e) {}
+}
+
 
 var memwatch = require('memwatch-next')
 var express  = require('express');
 var app      = express(); 								// create our app w/ express
 var mongoose = require('mongoose'); 					// mongoose for mongodb
+var version = require('mongoose/package.json').version
 var morgan = require('morgan'); 			// log requests to the console (express4)
 var bodyParser = require('body-parser'); 	// pull information from HTML POST (express4)
 var methodOverride = require('method-override'); // simulate DELETE and PUT (express4)
@@ -91,6 +101,7 @@ var url = require('url')
 var fs = require('fs')
 var heapdump = require('heapdump')
 var soap = require('soap')
+var semver = require('semver')
 
 function clsCheck (msg) {
   let c = ao.requestStore
@@ -229,6 +240,7 @@ var mongoHost = typeof argv.be_ip === 'string' ? argv.be_ip : '127.0.0.1:27017'
 if (!~mongoHost.indexOf(':')) mongoHost += ':27017'
 
 var mongoOpts = {
+  useMongoClient: true,
   reconnectTries: 10,
   reconnectInterval: 2000
 }
@@ -239,16 +251,42 @@ let mongooseError = null
 // of pages are available without error.
 //
 if (!argv.heroku) {
-  mongoose.connect('mongodb://' + mongoHost + '/my_database', mongoOpts, function (err) {
-    if (err) {
+  if (semver.gte(version, '5.0.0')) {
+    mongoose.connect('mongodb://' + mongoHost + '/my_database', mongoOpts).then(db => {
+      console.log('GOT MONGODB OPEN ON PROMISE', Object.keys(db))
+    }).catch(err => {
       console.log('mongoose failed to connect to', mongoHost, err)
       console.log('\n\nyou may specify the host with the command line option')
       console.log('be_ip. for example,')
       console.log('     --be_ip=localhost:27099')
       process.exit(1)
       mongooseError = err
-    }
-  })
+    })
+  } else if (semver.gte(version, '4.0.0')) {
+    mongoose.connect('mongodb://' + mongoHost + '/my_database', mongoOpts, function (err) {
+      if (err) {
+        console.log('mongoose failed to connect to', mongoHost, err)
+        console.log('\n\nyou may specify the host with the command line option')
+        console.log('be_ip. for example,')
+        console.log('     --be_ip=localhost:27099')
+        process.exit(1)
+        mongooseError = err
+      }
+    }).then(db => {
+      console.log('GOT MONGODB OPEN ON PROMISE', Object.keys(db))
+    })
+  } else if (semver.gte(version, '3.0.0')) {
+    mongoose.connect('mongodb://' + mongoHost + '/my_database', mongoOpts, function (err) {
+      if (err) {
+        console.log('mongoose failed to connect to', mongoHost, err)
+        console.log('\n\nyou may specify the host with the command line option')
+        console.log('be_ip. for example,')
+        console.log('     --be_ip=localhost:27099')
+        process.exit(1)
+        mongooseError = err
+      }
+    })
+  }
 }
 
 //
@@ -430,7 +468,10 @@ app.get('/config', function getConfig (req, res) {
 
   res.json({
     configuration: ao.configuration,
-    bindings: ao.dummyAddon ? false : !!ao.addon,
+    appopticsVersion: aoVersion,
+    contextProvider: ao.contextProvider,
+    bindingsVersion: bindingsVersion,
+    oboeVersion: ao.dummyAddon ? 'error' : ao.addon.Config.getVersionString(),
     serviceKey: process.env.APPOPTICS_SERVICE_KEY || '<not present>',
     sampleRate: ao.sampleRate,
     sampleMode: (ao.traceMode !== undefined) ? ao.traceMode : 'unset',
