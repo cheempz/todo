@@ -6,8 +6,8 @@
     "start": "node server.js --heroku"
   },
   "dependencies": {
-    "angular": "1.2.22",
-    "appoptics-apm": "^5.4.0",
+    "angular": "^1.7.5",
+    "appoptics-apm": "^5.7.0",
     "axios": "^0.16.2",
     "body-parser": "~1.5.2",
     "express": "~4.7.2",
@@ -16,7 +16,7 @@
     "memwatch-next": "^0.3.0",
     "method-override": "~2.1.2",
     "minimist": "^1.2.0",
-    "mongoose": "~3.8.27",
+    "mongoose": "^4.13.17",
     "morgan": "~1.2.2",
     "optimist": "*",
     "randomstring": "^1.1.5",
