@@ -31,6 +31,11 @@ var skeletalAddon = {
   },
   Metadata: {
     getMetadataData: function () { return { active: 0, freedBytes: 0, freedCount: 0 } }
+  },
+  Config: {
+    getVersionString () {
+      return '<not loaded>'
+    }
   }
 }
 
@@ -64,6 +69,7 @@ if (configuration === 'traceview') {
   ao.probes = {express: {}}
 } else if (configuration === 'appoptics' || configuration === '' || configuration === undefined) {
   try {
+    //process.env.APPOPTICS_SERVICE_KEY = process.env.AO_TOKEN_STG + ':node-changed-it'
     ao = require('appoptics-apm')
     ao.configuration = 'appoptics'
     if (!ao.addon) {
@@ -78,16 +84,18 @@ if (configuration === 'traceview') {
 }
 
 let aoVersion = 'error'
-let bindingsVersion = 'error'
+let bindingsVersion = '<not loaded>'
 if (ao.configuration === 'appoptics') {
   try {
     aoVersion = require('appoptics-apm/package.json').version
-    bindingsVersion = require('appoptics-bindings/package.json').version
+    if (ao.addon !== skeletalAddon) {
+      bindingsVersion = require('appoptics-bindings/package.json').version
+    }
   } catch (e) {}
 }
 
 
-var memwatch = require('memwatch-next')
+//var memwatch = require('memwatch-next')
 var express  = require('express');
 var app      = express(); 								// create our app w/ express
 var mongoose = require('mongoose'); 					// mongoose for mongodb
@@ -167,6 +175,7 @@ var memInt = setInterval(function () {
   //metadatas.addItem()
 }, minutes(10))
 
+/*
 memwatch.on('stats', function (stats) {
   if (!firstStats) {
     firstStats = stats
@@ -195,6 +204,7 @@ memwatch.on('stats', function (stats) {
 
   lastStats = stats
 })
+// */
 
 var modeMap = {
   0: 0,
@@ -472,7 +482,7 @@ app.get('/config', function getConfig (req, res) {
     contextProvider: ao.contextProvider,
     bindingsVersion: bindingsVersion,
     oboeVersion: ao.dummyAddon ? 'error' : ao.addon.Config.getVersionString(),
-    serviceKey: process.env.APPOPTICS_SERVICE_KEY || '<not present>',
+    serviceKey: ao.serviceKey ||'<none>',
     sampleRate: ao.sampleRate,
     sampleMode: (ao.traceMode !== undefined) ? ao.traceMode : 'unset',
     pid: pid
@@ -642,7 +652,7 @@ var heapBase
 
 app.get('/diff/:what', function heapDiff (req, res) {
   show && console.log(req.headers)
-
+  /*
   if (req.params.what === 'mark') {
     heapBase = new memwatch.HeapDiff()
     heapBase.__ao = getRSS()
@@ -656,6 +666,7 @@ app.get('/diff/:what', function heapDiff (req, res) {
     res.statusCode = 404
     res.send()
   }
+  // */
 })
 
 app.get('/heapdump', function heapDump (req, res) {
