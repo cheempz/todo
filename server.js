@@ -69,7 +69,6 @@ if (configuration === 'traceview') {
   ao.probes = {express: {}}
 } else if (configuration === 'appoptics' || configuration === '' || configuration === undefined) {
   try {
-    //process.env.APPOPTICS_SERVICE_KEY = process.env.AO_TOKEN_STG + ':node-changed-it'
     ao = require('appoptics-apm')
     ao.configuration = 'appoptics'
     if (!ao.addon) {
@@ -256,6 +255,8 @@ var mongoOpts = {
 }
 
 let mongooseError = null
+// override deprecated mongoose built-in promises
+mongoose.Promise = Promise
 //
 // if heroku mode don't look for a mongo server. only a subset
 // of pages are available without error.
@@ -263,7 +264,7 @@ let mongooseError = null
 if (!argv.heroku) {
   if (semver.gte(version, '5.0.0')) {
     mongoose.connect('mongodb://' + mongoHost + '/my_database', mongoOpts).then(db => {
-      console.log('GOT MONGODB OPEN ON PROMISE', Object.keys(db))
+      console.log('OPENED MONGODB with Promise'/*, Object.keys(db)*/)
     }).catch(err => {
       console.log('mongoose failed to connect to', mongoHost, err)
       console.log('\n\nyou may specify the host with the command line option')
@@ -283,7 +284,7 @@ if (!argv.heroku) {
         mongooseError = err
       }
     }).then(db => {
-      console.log('GOT MONGODB OPEN ON PROMISE', Object.keys(db))
+      console.log('OPENED MONGODB with Promise', /*Object.keys(db)*/)
     })
   } else if (semver.gte(version, '3.0.0')) {
     mongoose.connect('mongodb://' + mongoHost + '/my_database', mongoOpts, function (err) {
@@ -294,6 +295,8 @@ if (!argv.heroku) {
         console.log('     --be_ip=localhost:27099')
         process.exit(1)
         mongooseError = err
+      } else {
+        console.log('OPENED MONGODB with callback')
       }
     })
   }
@@ -370,10 +373,11 @@ var Todo = mongoose.model('Todo', {
 
 // api ---------------------------------------------------------------------
 app.all('*', function allRoutes (req, res, next) {
-  clsCheck('in globalroute')
+  //clsCheck('in globalroute')
   requests += 1
   next()
 })
+
 // get all todos
 app.get('/api/todos', function getAllTodos (req, res) {
   show && console.log(req.headers)
