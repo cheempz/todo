@@ -1,5 +1,5 @@
 {
-  "name": "todomvc-appoptics",
+  "name": "todo-mongo-appoptics",
   "version": "0.4.0",
   "main": "server.js",
   "scripts": {
@@ -24,6 +24,6 @@
   },
   "repository": {
     "type": "git",
-    "url": "git://github.com/GoogleCloudPlatform/todomvc-mongodb.git"
+    "url": "git://github.com/bmacnaughton/todomvc-mongodb.git"
   }
 }
