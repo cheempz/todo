@@ -1,6 +1,6 @@
 {
-  "name": "todomvc-angular",
-  "version": "0.3.0",
+  "name": "todomvc-appoptics",
+  "version": "0.4.0",
   "main": "server.js",
   "scripts": {
     "start": "node server.js --heroku"
