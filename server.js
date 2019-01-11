@@ -144,6 +144,7 @@ function getRSS () {
 
 var rssHistory = [getRSS()]
 
+/*
 function ObjectData (name, n, fn) {
   this.name = name
   this.maxItems = n
@@ -163,6 +164,7 @@ ObjectData.prototype.addItem = function () {
 }
 var events = new ObjectData('events', 5, ao.addon.Event.getEventData)
 var metadatas = new ObjectData('metadatas', 5, ao.addon.Metadata.getMetadataData)
+// */
 
 function minutes (n) {
   return n * 1000 * 60
