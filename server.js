@@ -46,7 +46,6 @@ const argv = require('optimist').argv;
 const http = require('http')
 const url = require('url')
 const path = require('path')
-const soap = require('soap')
 
 const modeMap = {
   0: 0,
@@ -122,7 +121,6 @@ const options = {
   key: "-----BEGIN RSA PRIVATE KEY-----\nMIICXQIBAAKBgQCsJU2dO/K3oQEh9wo60VC2ajCZjIudc8cqHl9kKNKwc9lP4Rw9\nKWso/+vHhkp6Cmx6Cshm6Hs00rPgZo9HmY//gcj0zHmNbagpmdvAmOudK8l5Npzd\nQwNROKN8EPoKjlFEBMnZj136gF5YAgEN9ydcLtS2TeLmUG1Y3RR6ADjgaQIDAQAB\nAoGBAJTD9/r1n5/JZ+0uTIzf7tx1kGJh7xW2xFtFvDIWhV0wAJDjfT/t10mrQNtA\n1oP5Fh2xy9YC+tZ/cCtw9kluD93Xhzg1Mz6n3h+ZnvnlMb9E0JCgyCznKSS6fCmb\naBz99pPJoR2JThUmcuVtbIYdasqxcHStYEXJH89Ehr85uqrBAkEA31JgRxeuR/OF\n96NJFeD95RYTDeN6JpxJv10k81TvRCxoOA28Bcv5PwDALFfi/LDya9AfZpeK3Nt3\nAW3+fqkYdQJBAMVV37vFQpfl0fmOIkMcZKFEIDx23KHTjE/ZPi9Wfcg4aeR4Y9vt\nm2f8LTaUs/buyrCLK5HzYcX0dGXdnFHgCaUCQDSc47HcEmNBLD67aWyOJULjgHm1\nLgIKsBU1jI8HY5dcHvGVysZS19XQB3Zq/j8qMPLVhZBWA5Ek41Si5WJR1EECQBru\nTUpi8WOpia51J1fhWBpqIbwevJ2ZMVz0WPg85Y2dpVX42Cf7lWnrkIASaz0X+bF+\nTMPuYzmQ0xHT3LGP0cECQQCqt4PLmzx5KtsooiXI5NVACW12GWP78/6uhY6FHUAF\nnJl51PB0Lz8F4HTuHhr+zUr+P7my7X3b00LPog2ixKiO\n-----END RSA PRIVATE KEY-----",
   cert: "-----BEGIN CERTIFICATE-----\nMIICWDCCAcGgAwIBAgIJAPIHj8StWrbJMA0GCSqGSIb3DQEBCwUAMEUxCzAJBgNV\nBAYTAkFVMRMwEQYDVQQIDApTb21lLVN0YXRlMSEwHwYDVQQKDBhJbnRlcm5ldCBX\naWRnaXRzIFB0eSBMdGQwHhcNMTQwODI3MjM1MzUwWhcNMTQwOTI2MjM1MzUwWjBF\nMQswCQYDVQQGEwJBVTETMBEGA1UECAwKU29tZS1TdGF0ZTEhMB8GA1UECgwYSW50\nZXJuZXQgV2lkZ2l0cyBQdHkgTHRkMIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKB\ngQCsJU2dO/K3oQEh9wo60VC2ajCZjIudc8cqHl9kKNKwc9lP4Rw9KWso/+vHhkp6\nCmx6Cshm6Hs00rPgZo9HmY//gcj0zHmNbagpmdvAmOudK8l5NpzdQwNROKN8EPoK\njlFEBMnZj136gF5YAgEN9ydcLtS2TeLmUG1Y3RR6ADjgaQIDAQABo1AwTjAdBgNV\nHQ4EFgQUTqL/t/yOtpAxKuC9zVm3PnFdRqAwHwYDVR0jBBgwFoAUTqL/t/yOtpAx\nKuC9zVm3PnFdRqAwDAYDVR0TBAUwAwEB/zANBgkqhkiG9w0BAQsFAAOBgQBn1XAm\nAsVdXKr3aiZIgOmw5q+F1lKNl/CHtAPCqwjgntPGhW08WG1ojhCQcNaCp1yfPzpm\niaUwFrgiz+JD+KvxvaBn4pb95A6A3yObADAaAE/ZfbEA397z0RxwTSVU+RFKxzvW\nyICDpugdtxRjkb7I715EjO9R7LkSe5WGzYDp/g==\n-----END CERTIFICATE-----"
 }
-
 
 app.use('/js', express.static(path.join(__dirname, '/js')))
 app.use('/bower_components', express.static(path.join(__dirname, '/bower_components')))
@@ -264,11 +262,63 @@ app.get('/error/:code', function error (req, res) {
 })
 
 //=====================================================================================
+// custom instrumentation for sync, async, and promises ===============================
+//=====================================================================================
+
+const customPromise = new requests.CustomPromise()
+const customAsync = new requests.CustomAsync()
+const customSync = new requests.CustomSync()
+
+const cp = require('child_process')
+
+
+app.get('/custom/:how?/:what?', function custom (req, res) {
+
+  // valid 'how' options. 'what' options are ignored for now.
+  if (req.params.how === 'async') {
+    const runExecAsync = cb => cp.exec('ls -lR ./node_modules/appoptics-apm', cb)
+
+    customAsync.instrument('custom-async-ls', runExecAsync).then(r => {
+      res.send(r[1])
+      res.end('executed custom-async\n')
+    }).catch(e => {
+      console.log(e)
+      res.statusCode = 418
+      res.end()
+    })
+  } else if (req.params.how === 'promise') {
+    const runPromise = () => delay.milliseconds(275)
+
+    customPromise.instrument('custom-promise', runPromise).then(r => {
+      res.json(r)
+    }).catch(e => {
+      console.log(e)
+      res.statusCode = 418
+      res.end()
+    })
+  } else if (req.params.how === 'sync') {
+    const runSpawnSync = () => cp.spawnSync('ls', ['-lR'])
+
+    customSync.instrument('custom-sync-ls', runSpawnSync).then(r => {
+      res.send(r.stdout)
+    }).catch(e => {
+      console.log(e)
+      res.statusCode = 418
+      res.end()
+    })
+  } else {
+    res.statusCode = 404
+    res.end()
+  }
+})
+
+//=====================================================================================
 // random more complicated stuff for now.
 //=====================================================================================
 
+/*
+const soap = require('soap')
 const wsdlURL = 'http://localhost:3000/wsdl?wsdl'
-
 app.get('/soap/:string', function makeSoapCall (req, res) {
   soap.createClientAsync(wsdlURL).then(client => {
     console.log('got soap async client')
@@ -288,110 +338,12 @@ app.get('/soap/:string', function makeSoapCall (req, res) {
 
 })
 
-
-app.get('/custom-async', function customAsync (req, res) {
-  const s = require('child_process')
-
-  // list the appoptics-apm directory tree for something to do
-  function runExecAsync (cb) {
-    s.exec('ls -lR ./node_modules/appoptics-apm', cb)
-  }
-
-  // instrument the listing function
-  ao.instrument(
-    'todo-custom-async-ls',
-    runExecAsync,
-    {customTxName: 'this-should-not-appear'},
-    function (err, stdout, stderr) {
-      if (err) {
-        res.statusCode = 418
-        console.log(err)
-      }
-      res.send('executed todo-custom-async-ls\n')
-    }
-  )
-})
-
-app.get('/sdk/:how', function sdk (req, res) {
-  show && console.log(req.headers)
-
-  const s = require('child_process')
-
-
-  if (req.params.how === 'sync') {
-    function runSpawnSync () {
-      console.log('runSpawn() invoked')
-      s.spawnSync('ls', ['-lR'])
-      console.log('runSpawn() done')
-    }
-    ao.instrument(
-      'todo-sdk-sync-ls',
-      runSpawnSync,
-      {customTxName: 'this-should-not-appear'}
-    )
-    res.send('executed todo-sdk-sync-ls\n')
-  } else if (req.params.how === 'async') {
-    function runExecAsync (cb) {
-      console.log('runExecAsync () invoked')
-      s.exec('ls -lR ./node_modules/appoptics-apm', cb)
-    }
-    ao.instrument(
-      'todo-sdk-async-ls',
-      runExecAsync,
-      {customTxName: 'this-should-not-appear'},
-      function (err, stdout, stderr) {
-        if (err) {
-          res.statusCode = 418
-          console.log(err)
-        }
-        res.send('executed todo-sdk-async-ls\n')
-      }
-    )
-  } else if (req.params.how === 'promise') {
-
-    function runPromise (done) {
-      const p = new Promise(runPromiseExec)
-      return p.then(r => {
-        done()
-      })
-    }
-
-    function runPromiseExec (resolve, reject) {
-      function execCallback (err, stdout, stderr) {
-        if (!err) {
-          resolve('success')
-        } else {
-          reject(err)
-        }
-      }
-      s.exec('ls -lR ./node_modules/appoptics-apm', execCallback)
-    }
-
-    ao.instrument(
-      'todo-sdk-promise-ls',
-      runPromise,
-      {customTxName: 'this-should-not-appear'},
-      function (err, stdout, stderr) {
-        if (err) {
-          res.statusCode = 418
-          console.log(err)
-        }
-        res.send('executed todo-sdk-promise-ls\n')
-      }
-    )
-
-
-  } else {
-    res.statusCode = 404
-    res.send()
-  }
-})
+// */
 
 // do a transaction to another server
 app.get('/downstream/:url', function downstream (req, res) {
-  show && console.log(req.headers)
 
-  var options = {
+  const options = {
     protocol: 'http:',
     port: 8881,
     hostname: 'localhost',
@@ -403,7 +355,7 @@ app.get('/downstream/:url', function downstream (req, res) {
   }
 
   const oreq = http.request(options, function (ires) {
-    body = ''
+    let body = ''
     ires.on('data', function (d) {
       body += d
     })
@@ -425,7 +377,7 @@ app.get('/downstream/:url', function downstream (req, res) {
 })
 
 
-function makePrefix(URL) {
+function makePrefix (URL) {
   return '--- response from ' + URL + ' ---\nheaders: '
 }
 //
@@ -434,29 +386,29 @@ function makePrefix(URL) {
 app.get('/chain', function chain (req, res) {
   show && console.log('chain req headers', req.headers)
 
-  var q = req.query.target
+  const q = req.query.target
 
   if (!q) {
     res.send('this is the end!\n')
     return
   }
 
-  var options = url.parse(q)
+  const options = url.parse(q)
   if (req.headers['X-Trace']) {
     options.headers = {'X-Trace': req.headers['X-Trace']}
   }
 
   // now do the outbound request and get the inbound response
   const oreq = http.request(options, function (ires) {
-    var body = ''
+    let body = ''
     ires.on('data', function (d) {
       body += d
     })
     // on end return it along with the headers
     ires.on('end', function () {
       show && console.log(ires.headers)
-      var p = makePrefix(q)
-      var h = JSON.stringify(ires.headers)
+      const p = makePrefix(q)
+      const h = JSON.stringify(ires.headers)
       res.send(p + h + '\nbody: ' + body + '\n')
     })
     ires.on('error', function (e) {
@@ -482,8 +434,8 @@ app.get('/chain', function chain (req, res) {
 app.get('/chain2', function chain2 (req, res) {
   show && console.log('chain2 req headers', req.headers)
 
-  var request = require('request')
-  var options = {
+  const request = require('request')
+  const options = {
     url: url.parse(req.query.target),
     headers: {
       'user-agent': 'request'
@@ -492,8 +444,8 @@ app.get('/chain2', function chain2 (req, res) {
   function callback (err, response, body) {
     if (!err && response.statusCode === 200) {
       show && console.log('chain2 callback:', response.headers)
-      var p = makePrefix(req.query.target)
-      var h = JSON.stringify(response.headers)
+      const p = makePrefix(req.query.target)
+      const h = JSON.stringify(response.headers)
       res.send(p + h + '\nbody: ' + body + '\n')
     }
   }
@@ -501,8 +453,9 @@ app.get('/chain2', function chain2 (req, res) {
   request(options, callback)
 })
 
-
-// application -------------------------------------------------------------
+//==========================================================================
+// application =============================================================
+//==========================================================================
 app.get('/', function home (req, res) {
   // load the single view file (angular will handle the page changes on the front-end)
   res.sendfile('index.html');
@@ -510,8 +463,12 @@ app.get('/', function home (req, res) {
 
 app.use(function (req, res) {
   res.status(404)
-  let body = 'page not found\n'
-  if (req.accepts('json')) body = {error: 'page not found'}
+  let body
+  if (req.accepts('json')) {
+    body = {error: 'page not found'}
+  } else {
+    body = 'page not found\n'
+  }
   res.send(body)
 })
 
@@ -542,7 +499,9 @@ const dashes = Buffer.alloc(line.length, '-').toString()
 console.log(dashes)
 console.log(line)
 
-console.log(`active components apm: ${serverConfig.appoptics}, bindings: ${serverConfig.bindings}`)
-console.log(`apm ${ao.version}, bindings ${ao.addon.version}, oboe ${ao.addon.Config.getVersionString()}`)
+console.log(`active: ${serverConfig.appoptics}, bindings: ${serverConfig.bindings}`)
+console.log(
+  `apm ${ao.version}, bindings ${ao.addon.version}, oboe ${ao.addon.Config.getVersionString()}`
+)
 console.log(`sample rate ${ao.sampleRate}, sampleMode ${ao.sampleMode}`)
 console.log(dashes)
