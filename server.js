@@ -34,6 +34,7 @@ const ao = serverConfig.ao
 // request wraps the individual request constructors and fills in ao for them
 // there's certainly a better way to do this but i haven't figured it out yet.
 const requests = require('./lib/requests')(ao)
+const accounting = new requests.Accounting()
 
 // standard require files that should be instrumented
 const express  = require('express');
@@ -139,12 +140,15 @@ app.use(methodOverride());
 //==============================================================================
 // routes ======================================================================
 //==============================================================================
-let count = 0
 
 // api ---------------------------------------------------------------------
 app.all('*', function allRoutes (req, res, next) {
-  count += 1
+  accounting.count()
   next()
+})
+
+app.get('/accounting', function (req, res) {
+  res.json(accounting.get())
 })
 
 //==============================================================================
@@ -269,48 +273,54 @@ const customPromise = new requests.CustomPromise()
 const customAsync = new requests.CustomAsync()
 const customSync = new requests.CustomSync()
 
+const wrap = requests.CustomPromise.wrapAsync
+
 const cp = require('child_process')
 
+// how: sync, async, promise
+// what: ls, delay
+// x: execute, [r: result | j: json]
+const hows = {
+  sync: {
+    ls: {x: () => cp.spawnSync('ls', ['-lR']), r: r => r.stdout},
+  },
+  async: {
+    ls: {x: cb => cp.exec('ls -lR ./node_modules/appoptics-apm', cb), r: r => r[1]},
+    delay: {x: cb => delay.cbMilliseconds(250, cb), j: r => r[0]},
+  },
+  promise: {
+    ls: {x: wrap(cb => cp.exec('ls -lR ./node_modules/appoptics-apm', cb)), r: r => r[1]},
+    delay: {x: () => delay.milliseconds(275), j: r => r},
+  }
+}
 
 app.get('/custom/:how?/:what?', function custom (req, res) {
   const how = req.params.how
-
-  // valid 'how' options. 'what' options are ignored for now.
-  if (how === 'async') {
-    const runExecAsync = cb => cp.exec('ls -lR ./node_modules/appoptics-apm', cb)
-
-    customAsync.instrument('custom-async-ls', runExecAsync).then(r => {
-      res.send(r[1])
-      res.end('executed custom-async\n')
-    }).catch(e => {
-      console.log(e)
-      res.statusCode = 418
-      res.end()
-    })
-  } else if (how === 'promise' || how === 'epromise') {
-    const runPromise = () => delay.milliseconds(275).then(r => how === 'promise' ? r : xyzzy)
-
-    customPromise.instrument('custom-promise', runPromise).then(r => {
-      res.json(r)
-    }).catch(e => {
-      console.log(e)
-      res.statusCode = 418
-      res.end()
-    })
-  } else if (how === 'sync') {
-    const runSpawnSync = () => cp.spawnSync('ls', ['-lR'])
-
-    customSync.instrument('custom-sync-ls', runSpawnSync).then(r => {
-      res.send(r.stdout)
-    }).catch(e => {
-      console.log(e)
-      res.statusCode = 418
-      res.end()
-    })
-  } else {
+  const what = req.params.what
+  if (!hows[how] || !hows[how][what]) {
     res.statusCode = 404
+    res.json(hows)
     res.end()
+    return
   }
+
+  const executor = {
+    sync: customSync,
+    async: customAsync,
+    promise: customPromise,
+  }[how]
+  const name = `custom-${how}-${what}`
+
+  const cfg = hows[how][what]
+
+  executor['instrument'](name, cfg.x).then(r => {
+    res[cfg.r ? 'send' : 'json']((cfg.r || cfg.j)(r))
+  }).catch(e => {
+    console.log(e)
+    res.statusCode = 418
+    res.end()
+  })
+
 })
 
 //=====================================================================================
