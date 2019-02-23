@@ -273,9 +273,10 @@ const cp = require('child_process')
 
 
 app.get('/custom/:how?/:what?', function custom (req, res) {
+  const how = req.params.how
 
   // valid 'how' options. 'what' options are ignored for now.
-  if (req.params.how === 'async') {
+  if (how === 'async') {
     const runExecAsync = cb => cp.exec('ls -lR ./node_modules/appoptics-apm', cb)
 
     customAsync.instrument('custom-async-ls', runExecAsync).then(r => {
@@ -286,8 +287,8 @@ app.get('/custom/:how?/:what?', function custom (req, res) {
       res.statusCode = 418
       res.end()
     })
-  } else if (req.params.how === 'promise') {
-    const runPromise = () => delay.milliseconds(275)
+  } else if (how === 'promise' || how === 'epromise') {
+    const runPromise = () => delay.milliseconds(275).then(r => how === 'promise' ? r : xyzzy)
 
     customPromise.instrument('custom-promise', runPromise).then(r => {
       res.json(r)
@@ -296,7 +297,7 @@ app.get('/custom/:how?/:what?', function custom (req, res) {
       res.statusCode = 418
       res.end()
     })
-  } else if (req.params.how === 'sync') {
+  } else if (how === 'sync') {
     const runSpawnSync = () => cp.spawnSync('ls', ['-lR'])
 
     customSync.instrument('custom-sync-ls', runSpawnSync).then(r => {
