@@ -483,6 +483,7 @@ app.use(function (req, res) {
   res.send(body)
 })
 
+let promises
 let port
 let host
 let httpsPort
@@ -490,29 +491,59 @@ if (!argv.heroku) {
   host = webServerHost.split(':')
   port = +host[1]
   host = host[0]
-  // hardcode the https port
-  let httpsPort = 8443
-  app.listen(port, host)
-  app.listen(httpsPort).on('error', function (e) {
-    console.log('https disabled:', e.code)
-    httpsPort = 'N/A'
+
+  const p1 = new Promise((resolve, reject) => {
+    function x (...args) {
+      resolve(args)
+    }
+    app.listen(port, host).on('listening', x).on('error', x)
   })
+  // hardcode the https port
+  httpsPort = 8443
+  const p2 = new Promise((resolve, reject) => {
+    function x (...args) {
+      resolve(args)
+    }
+    app.listen(httpsPort).on('listening', x).on('error', x)
+  })
+  promises = [p1, p2]
 } else {
   port = process.env.PORT
-  app.listen(port)
+  const p1 = new Promise((resolve, reject) => {
+    function x (...args) {
+      resolve(args)
+    }
+    app.listen(port, host).on('listening', x).on('error', x)
+  })
+  promises = [p1]
 }
 
-const tty = require('tty')
-const text = tty.isatty(process.stdout.fd) ? 'on a tty' : 'not a tty'
-const https = httpsPort ? '(https:' + httpsPort + ')' : ''
-const line = ['todo-tester listening on', webServerHost, https, text].join(' ')
-const dashes = Buffer.alloc(line.length, '-').toString()
-console.log(dashes)
-console.log(line)
+Promise.all(promises).then(r => {
+  // check https
+  if (r.length === 2) {
+    if (r[1] instanceof Error) {
+      console.log(r[1])
+      httpsPort = 'NA'
+    }
+  }
+  if (r[0] instanceof Error) {
+    throw r[0]
+  }
 
-console.log(`active: ${serverConfig.appoptics}, bindings: ${serverConfig.bindings}`)
-console.log(
-  `apm ${ao.version}, bindings ${ao.addon.version}, oboe ${ao.addon.Config.getVersionString()}`
-)
-console.log(`sample rate ${ao.sampleRate}, sampleMode ${ao.sampleMode}`)
-console.log(dashes)
+  const isatty = require('tty').isatty
+  const tty = [isatty(process.stdout.fd) ? 'on a tty' : 'not a tty']
+  const https = '(https:' + httpsPort + ')'
+
+  const line = ['todo-tester listening on', webServerHost, https, tty].join(' ')
+  const dashes = Buffer.alloc(line.length, '-').toString()
+  console.log(dashes)
+  console.log(line)
+
+  console.log(`active: ${serverConfig.appoptics}, bindings: ${serverConfig.bindings}`)
+  console.log(
+    `apm ${ao.version}, bindings ${ao.addon.version}, oboe ${ao.addon.Config.getVersionString()}`
+  )
+  console.log(`sample rate ${ao.sampleRate}, sampleMode ${ao.sampleMode}`)
+  console.log(dashes)
+
+})
