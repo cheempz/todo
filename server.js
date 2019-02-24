@@ -43,10 +43,19 @@ const app      = express(); 								// create our app w/ express
 const morgan = require('morgan'); 			// log requests to the console (express4)
 const bodyParser = require('body-parser'); 	// pull information from HTML POST (express4)
 const methodOverride = require('method-override'); // simulate DELETE and PUT (express4)
-const argv = require('optimist').argv;
+
+const fs = require('fs')
 const http = require('http')
 const url = require('url')
 const path = require('path')
+
+const version = require('./package.json').version
+
+
+//=========================================================
+// configuration and command line options =================
+//=========================================================
+const argv = require('optimist').argv;
 
 const modeMap = {
   0: 0,
@@ -73,10 +82,6 @@ function customExpressTxName (req, res) {
   console.log('custom name: ', customTxname)
   return customTxname
 }
-
-//=========================================================
-// configuration and command line options =================
-//=========================================================
 
 //
 // mongo DB
@@ -108,6 +113,36 @@ let rate = ('rate' in argv) ? +argv.rate : 1000000
 // this overrides a --rate setting.
 if ('r' in argv) rate = +argv.r * 10000
 ao.sampleRate = rate
+
+//
+// get host name for metrics and general status/config
+//
+let hostname = fs.readFileSync('/etc/hostname', 'utf8')
+if (hostname[hostname.length - 1] === '\n') {
+  hostname = hostname.slice(0, -1)
+}
+
+//
+// if supplied metrics must be a valid appoptics token (not service key)
+//
+if (argv.metrics || argv.m) {
+  const Metrics = require('./lib/metrics')
+
+  const m = new Metrics(
+    argv.metrics,
+    'https://api.appoptics.com/v1/measurements',
+    {image_name: hostname}
+  )
+
+  const ctx = m.sendOnInterval(5000, () => {
+    return {metrics: {'todo.memory.rss': process.memoryUsage().rss}}
+  })
+
+  // could work on restarting but not sure why
+  ctx.promise.catch(e => {
+    console.log(e)
+  })
+}
 
 
 //==================================
@@ -540,9 +575,12 @@ Promise.all(promises).then(r => {
   console.log(line)
 
   console.log(`active: ${serverConfig.appoptics}, bindings: ${serverConfig.bindings}`)
-  console.log(
-    `apm ${ao.version}, bindings ${ao.addon.version}, oboe ${ao.addon.Config.getVersionString()}`
-  )
+
+  const av = ao.version
+  const bv = ao.addon.version
+  const ov = ao.addon.Config.getVersionString()
+  console.log(`todo ${version}, apm ${av}, bindings ${bv}, oboe ${ov}`)
+
   console.log(`sample rate ${ao.sampleRate}, sampleMode ${ao.sampleMode}`)
   console.log(dashes)
 
