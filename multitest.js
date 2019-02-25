@@ -46,8 +46,8 @@ if (!action || argv.h || argv.help) {
 //
 // new timer-based distribution of transactions
 //
-let interval = (argv.i || 10) * 1000
-let transactionsPerInterval = argv.n || 1
+const interval = (argv.i || 10) * 1000
+const transactionsPerInterval = argv.n || 1
 let timerInterval =  interval / transactionsPerInterval * 1000
 
 let url = 'http://localhost:8088/api/todos'
@@ -56,7 +56,7 @@ if (argv.ws_ip) {
   url = 'http://' + argv.ws_ip + '/api/todos'
   delayUrl = 'http://' + argv.ws_ip + '/delay/'
 }
-let transaction = 'delay' in argv ? 'delay' : 'addDelete'
+const transaction = 'delay' in argv ? 'delay' : 'addDelete'
 
 
 let inFlight = 0    // number of transactions in progress
@@ -70,12 +70,12 @@ let addTime = 0     // ms to complete the transactions
 let delTime = 0
 
 const rd = n => n.toFixed(2)
-let makeAddDeleteStatsLine = function () {
-  let et = (mstime() - startTime) / 1000
-  let prefix = 'et: ' + et.toFixed(0)
-  let addText = 'added:' + addCount + '(' + rd(addCount/et) + '/sec)'
-  let delText = 'deleted:' + delCount + '(' + rd(delCount/et) + '/sec)'
-  let sampledText = 'sampled a:' + addsSampled + ', d:' + delsSampled
+const makeAddDeleteStatsLine = function () {
+  const et = (mstime() - startTime) / 1000
+  const prefix = 'et: ' + et.toFixed(0)
+  const addText = 'added:' + addCount + '(' + rd(addCount / et) + '/sec)'
+  const delText = 'deleted:' + delCount + '(' + rd(delCount / et) + '/sec)'
+  const sampledText = 'sampled a:' + addsSampled + ', d:' + delsSampled
   return prefix + ' ' + addText + ', ' + delText + ', ' + sampledText
 }
 let outputStats
@@ -91,15 +91,15 @@ if (process.stdout.isTTY) {
   }
 }
 
-let options = {
+const options = {
   headers: {
     'X-Requested-With': 'XMLHttpRequest',
     'Content-Type': 'application/json'
   }
 }
 
-function makePlainText(min = 10, max = 30) {
-  let length = min + Math.random() * (max - min)
+function makePlainText (min = 10, max = 30) {
+  const length = min + Math.random() * (max - min)
   return randomstring.generate(length)
 }
 
@@ -124,9 +124,9 @@ function executeGet (interval) {
 //
 function executeAdd (interval) {
   return wait(interval).then(() => {
-    let start = mstime()
-    let s = makePlainText()
-    let req = { title: s, completed: false }
+    const start = mstime()
+    const s = makePlainText()
+    const req = {title: s, completed: false}
     inFlight += 1
     return axios.post(url, req, options).then(r => {
       inFlight -= 1
@@ -146,7 +146,7 @@ function executeAdd (interval) {
 //
 function executeDelete (interval, todo) {
   return wait(interval).then(() => {
-    let start = mstime()
+    const start = mstime()
     inFlight += 1
     return axios.delete(url + '/' + todo._id, options).then(r => {
       inFlight -= 1
@@ -189,9 +189,9 @@ function makeAddDeletePair (addInterval, delInterval) {
 
 //
 // stats for makeDelay
-var delayCalls = 0
-var totalServerDelay = 0
-var totalDelay = 0
+let delayCalls = 0
+let totalServerDelay = 0
+let totalDelay = 0
 
 function makeDelay (interval, msDelay) {
   return function () {
@@ -199,7 +199,7 @@ function makeDelay (interval, msDelay) {
       delayCalls += 1
       totalServerDelay += r.serverDelay
       totalDelay += r.totalDelay
-      var makeLine = () => [
+      const makeLine = () => [
         'n: ', delayCalls,
         ', delay (tot, server) avg (',
         rd(totalDelay / delayCalls), ', ', rd(totalServerDelay / delayCalls),
@@ -212,7 +212,7 @@ function makeDelay (interval, msDelay) {
 
 function executeDelay (interval, msDelay) {
   return wait(interval).then(() => {
-    var start = mstime()
+    const start = mstime()
     return axios.get(delayUrl + msDelay, options).then(r => {
       return {serverDelay: r.data.actualDelay, totalDelay: mstime() - start}
     })
@@ -220,13 +220,13 @@ function executeDelay (interval, msDelay) {
 }
 
 if (argv.delete) {
-  let outstanding = []
+  const outstanding = []
   executeGet(0).then(r => {
-    let todosToDelete = r.data
-    while(todosToDelete.length) {
+    const todosToDelete = r.data
+    while (todosToDelete.length) {
       console.log('todos to delete: ', todosToDelete.length)
-      let todo = todosToDelete.shift()
-      let p = executeDelete(100, todo).then(() => {
+      const todo = todosToDelete.shift()
+      const p = executeDelete(100, todo).then(() => {
         return 1
       }).catch(e => {
         console.log(e)
@@ -251,7 +251,7 @@ function actionAddDelete () {
   makeAddDeletePair(0, getDelay())()
 
   // start additional add/delete pairs on interval
-  let iid = setInterval(function () {
+  const iid = setInterval(function () {
     makeAddDeletePair(getDelay(interval), getDelay(interval))()
   }, interval / transactionsPerInterval)
 }
@@ -260,16 +260,16 @@ function actionDelay () {
 
   makeDelay(0, delay)()
 
-  let iid = setInterval(function () {
+  const iid = setInterval(function () {
     makeDelay(getDelay(interval), delay)()
   }, interval / transactionsPerInterval)
 
-  return
   // NEVER GETS HERE NOW
 
   // TODO NEED ERROR HANDLING...
   // just make the delayed calls.
   // TODO BAM consider adjusting interval for delay in transaction?
+  /*
   var delayCalls = 0
   var totalServerDelay = 0
   var totalDelay = 0
@@ -325,4 +325,3 @@ if (transaction === 'delay') {
   }, interval / transactionsPerInterval)
 }
 // */
-
