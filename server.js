@@ -175,7 +175,7 @@ app.use('/bower_components', express.static(path.join(__dirname, '/bower_compone
 app.use(morgan('dev', {
   skip: function (req, res) {
     if (log === 'errors') {
-      return res.statusCode < 400
+      return res.statusCode < 400 || res.statusCode === 512
     }
     return false
   }
