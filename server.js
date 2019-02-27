@@ -64,7 +64,7 @@ const modeMap = {
   always: 1
 }
 if ('sampleMode' in argv) {
-  ao.sampleMode = modeMap[argv.sampleMode]
+  ao.traceMode = modeMap[argv.sampleMode]
 }
 
 if (ao.setCustomTxNameFunction && (argv.c || argv.custom)) {
@@ -122,6 +122,7 @@ if (hostname[hostname.length - 1] === '\n') {
   hostname = hostname.slice(0, -1)
 }
 
+const minutesToMs = m => m * 60000
 //
 // if supplied metrics must be a valid appoptics token (not service key)
 //
@@ -131,11 +132,14 @@ if (argv.metrics || argv.m) {
   const m = new Metrics(
     argv.metrics,
     'https://api.appoptics.com/v1/measurements',
-    {image_name: hostname}
+    {image_name: `${hostname}-${ao.version}`}
   )
 
   const ctx = m.sendOnInterval(5000, () => {
-    return {metrics: {'todo.memory.rss': process.memoryUsage().rss}}
+    return {metrics: {
+      'todo.memory.rss': process.memoryUsage().rss,
+      'todo.cpu.perTransaction': accounting.get().cpuUserPerTx[minutesToMs(1)]
+    }}
   })
 
   // could work on restarting but not sure why
@@ -581,7 +585,7 @@ Promise.all(promises).then(r => {
   const ov = ao.addon.Config.getVersionString()
   console.log(`apm ${av}, bindings ${bv}, oboe ${ov}`)
 
-  console.log(`sample rate ${ao.sampleRate}, sampleMode ${ao.sampleMode}`)
+  console.log(`sample rate ${ao.sampleRate}, sampleMode ${ao.traceMode}`)
   console.log(dashes)
 
   accounting.startIntervalAverages()
