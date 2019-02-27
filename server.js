@@ -100,9 +100,14 @@ if (typeof argv.fe_ip === 'number') {
 }
 if (!~webServerHost.indexOf(':')) webServerHost += ':8088'
 
-// log headers to console
-// TODO BAM use morgan.
-const show = argv.s || argv['show-headers'] || argv.h
+// log to console
+let log = argv.l || argv.log
+if (log && typeof log !== 'string') {
+  log = 'errors'
+} else if (log === 'xtrace') {
+} else if (log !== 'all') {
+  log = 'errors'
+}
 
 //
 // appoptics settings
@@ -129,6 +134,7 @@ const minutesToMs = m => m * 60000
 if (argv.metrics || argv.m) {
   const Metrics = require('./lib/metrics')
 
+  // set key, endpoint, and default tags
   const m = new Metrics(
     argv.metrics,
     'https://api.appoptics.com/v1/measurements',
@@ -138,7 +144,8 @@ if (argv.metrics || argv.m) {
   const ctx = m.sendOnInterval(5000, () => {
     return {metrics: {
       'todo.memory.rss': process.memoryUsage().rss,
-      'todo.cpu.perTransaction': accounting.get().cpuUserPerTx[minutesToMs(1)]
+      'todo.cpu.perTransaction': accounting.get().cpuUserPerTx[minutesToMs(1)],
+      'todo.apm.lastRate': accounting.get().lastRate,
     }}
   })
 
@@ -164,9 +171,14 @@ const options = { // eslint-disable-line
 
 app.use('/js', express.static(path.join(__dirname, '/js')))
 app.use('/bower_components', express.static(path.join(__dirname, '/bower_components')))
-// log every request to the console
+// log requests to the console
 app.use(morgan('dev', {
-  skip: function (req, res) {return false}
+  skip: function (req, res) {
+    if (log === 'errors') {
+      return res.statusCode < 400
+    }
+    return false
+  }
 }));
 // parse application/x-www-form-urlencoded
 app.use(bodyParser.urlencoded({'extended':'true'}));
@@ -572,8 +584,7 @@ Promise.all(promises).then(r => {
   //const isatty = require('tty').isatty
   //const tty = [isatty(process.stdout.fd) ? 'on a tty' : 'not a tty']
   const https = '(https:' + httpsPort + ')'
-
-  const line = [`todo ${version} listening on`, webServerHost, https].join(' ')
+  const line = `todo ${version} listening on ${webServerHost} ${https} log: ${log}`
   const dashes = Buffer.alloc(line.length, '-').toString()
   console.log(dashes)
   console.log(line)
