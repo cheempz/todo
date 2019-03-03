@@ -37,12 +37,63 @@ const requests = require('./lib/requests')(ao)
 const accounting = new requests.Accounting()
 
 // standard require files that should be instrumented
-const express  = require('express');
-const app      = express(); 								// create our app w/ express
+let frameworkSelection = 'express'
 
-const morgan = require('morgan'); 			// log requests to the console (express4)
-const bodyParser = require('body-parser'); 	// pull information from HTML POST (express4)
-const methodOverride = require('method-override'); // simulate DELETE and PUT (express4)
+let framework
+let server
+let logger
+// body parser functions
+let parseUrlEncoded
+let parseJson
+let parseVendorApi
+
+// framework
+//    bodyParser
+//    static
+//    logger
+
+if (frameworkSelection === 'express') {
+  // create the framework's app/server
+  framework = require('express')
+  server = framework()
+
+  //===================
+  // get the middleware
+  //===================
+
+  //
+  // logger
+  //
+  const morgan = require('morgan')
+
+  logger = morgan('dev', {
+    skip: function (req, res) {
+      if (log === 'errors') {
+        return res.statusCode < 400 || res.statusCode === 512
+      }
+      return false
+    }
+  })
+
+  //
+  // help parsing request data
+  //
+  const bodyParser = require('body-parser')
+
+  // parse application / x-www-form-urlencoded
+  parseUrlEncoded = bodyParser.urlencoded({'extended': 'true'})
+  // parse application/json
+  parseJson = bodyParser.json()
+  // parse application/vnd.api+json as json
+  parseVendorApi = bodyParser.json({type: 'application/vnd.api+json'})
+
+} else {
+
+}
+
+const app = server
+
+//const methodOverride = require('method-override'); // simulate DELETE and PUT (express4)
 
 const fs = require('fs')
 const http = require('http')
@@ -169,24 +220,19 @@ const options = { // eslint-disable-line
   cert: '-----BEGIN CERTIFICATE-----\nMIICWDCCAcGgAwIBAgIJAPIHj8StWrbJMA0GCSqGSIb3DQEBCwUAMEUxCzAJBgNV\nBAYTAkFVMRMwEQYDVQQIDApTb21lLVN0YXRlMSEwHwYDVQQKDBhJbnRlcm5ldCBX\naWRnaXRzIFB0eSBMdGQwHhcNMTQwODI3MjM1MzUwWhcNMTQwOTI2MjM1MzUwWjBF\nMQswCQYDVQQGEwJBVTETMBEGA1UECAwKU29tZS1TdGF0ZTEhMB8GA1UECgwYSW50\nZXJuZXQgV2lkZ2l0cyBQdHkgTHRkMIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKB\ngQCsJU2dO/K3oQEh9wo60VC2ajCZjIudc8cqHl9kKNKwc9lP4Rw9KWso/+vHhkp6\nCmx6Cshm6Hs00rPgZo9HmY//gcj0zHmNbagpmdvAmOudK8l5NpzdQwNROKN8EPoK\njlFEBMnZj136gF5YAgEN9ydcLtS2TeLmUG1Y3RR6ADjgaQIDAQABo1AwTjAdBgNV\nHQ4EFgQUTqL/t/yOtpAxKuC9zVm3PnFdRqAwHwYDVR0jBBgwFoAUTqL/t/yOtpAx\nKuC9zVm3PnFdRqAwDAYDVR0TBAUwAwEB/zANBgkqhkiG9w0BAQsFAAOBgQBn1XAm\nAsVdXKr3aiZIgOmw5q+F1lKNl/CHtAPCqwjgntPGhW08WG1ojhCQcNaCp1yfPzpm\niaUwFrgiz+JD+KvxvaBn4pb95A6A3yObADAaAE/ZfbEA397z0RxwTSVU+RFKxzvW\nyICDpugdtxRjkb7I715EjO9R7LkSe5WGzYDp/g==\n-----END CERTIFICATE-----'
 }
 
-app.use('/js', express.static(path.join(__dirname, '/js')))
-app.use('/bower_components', express.static(path.join(__dirname, '/bower_components')))
-// log requests to the console
-app.use(morgan('dev', {
-  skip: function (req, res) {
-    if (log === 'errors') {
-      return res.statusCode < 400 || res.statusCode === 512
-    }
-    return false
-  }
-}));
+app.use('/js', framework.static(path.join(__dirname, '/js')))
+app.use('/bower_components', framework.static(path.join(__dirname, '/bower_components')))
+app.use(logger)
+
 // parse application/x-www-form-urlencoded
-app.use(bodyParser.urlencoded({'extended':'true'}));
+app.use(parseUrlEncoded);
 // parse application/json
-app.use(bodyParser.json());
+app.use(parseJson);
 // parse application/vnd.api+json as json
-app.use(bodyParser.json({type: 'application/vnd.api+json'}));
-app.use(methodOverride());
+app.use(parseVendorApi);
+
+
+//app.use(methodOverride());
 
 //==============================================================================
 // routes ======================================================================
@@ -446,7 +492,6 @@ function makePrefix (URL) {
 // now make a chained URL
 //
 app.get('/chain', function chain (req, res) {
-  show && console.log('chain req headers', req.headers)
 
   const q = req.query.target
 
@@ -468,7 +513,6 @@ app.get('/chain', function chain (req, res) {
     })
     // on end return it along with the headers
     ires.on('end', function () {
-      show && console.log(ires.headers)
       const p = makePrefix(q)
       const h = JSON.stringify(ires.headers)
       res.send(p + h + '\nbody: ' + body + '\n')
@@ -494,7 +538,6 @@ app.get('/chain', function chain (req, res) {
 // http.request()
 //
 app.get('/chain2', function chain2 (req, res) {
-  show && console.log('chain2 req headers', req.headers)
 
   const request = require('request')
   const options = {
@@ -505,7 +548,6 @@ app.get('/chain2', function chain2 (req, res) {
   }
   function callback (err, response, body) {
     if (!err && response.statusCode === 200) {
-      show && console.log('chain2 callback:', response.headers)
       const p = makePrefix(req.query.target)
       const h = JSON.stringify(response.headers)
       res.send(p + h + '\nbody: ' + body + '\n')
