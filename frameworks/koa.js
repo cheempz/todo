@@ -51,7 +51,10 @@ exports.init = function (options) {
   //app.use(bodyParser.urlencoded({'extended': 'true'}))
 
   // parse application/vnd.api+json as json
-  app.use(bodyParser({extendTypes: {json: ['application/vnd.api+json']}}))
+  app.use(bodyParser({
+    enableType: ['json', 'form', 'text'],
+    extendTypes: {json: ['application/vnd.api+json']}
+  }))
 
 
   //==============================================================================
@@ -67,47 +70,56 @@ exports.init = function (options) {
   })
 
   router.get('/accounting', function (ctx, next) {
-    //ctx.status = 200
     ctx.body = accounting.get()
+    return next()
   })
 
   //==============================================================================
   // the todo api ================================================================
   //==============================================================================
 
+  const todos = new Router()
 
+  todos.get('/', (ctx, next) => ctx.body = 'get.todos (get-all)')
+  todos.post('/', (ctx, next) => ctx.body = `post.todos (${ctx.request.body.title})`)
+  todos.put('/:id/:z?', (ctx, next) => {console.log(ctx.params); ctx.body = `put.todos.${ctx.params.id}`})
+
+  router.use('/api/todos', todos.routes(), todos.allowedMethods())
+
+
+  const todos = new KoaRouter()
   // get all todos
-  router.get('/api/todos', getAllTodos)
-
-  function getAllTodos (req, res) {
-    todoapi.getAll().then(todos => {
-      res.json(todos)
+  router.get('/', getAllTodos)
+  function getAllTodos (ctx, next) {
+    return todoapi.getAll().then(todos => {
+      ctx.body = todos
     }).catch(err => {
-      res.send(err)
-    })
+      ctx.status = 500
+      ctx.body = {message: err.message}
+    }).then(next)
   }
 
   // create a todo and send it back with all todos after creation
-  router.post('/api/todos', createTodo)
-
-  function createTodo (req, res) {
+  // curl -d 'title=your title' -X POST localhost:8088/api/todos
+  router.post('/', createTodo)
+  function createTodo (ctx, next) {
     let todo
-    todoapi.create(req.body.title, false).then(r => {
+    todoapi.create(ctx.request.body.title, false).then(r => {
       todo = r
       return todoapi.getAll()
     }).then(todos => {
-      res.json({todo, todos})
+      ctx.body = {todo, todos}
     }).catch(e => {
-      res.send(e)
+      ctx.status = 500
+      ctx.body = {message: e.message}
     })
   }
 
   // update a todo and return it
-  router.put('/api/todos/:todo_id', updateTodo)
-
-  function updateTodo (req, res) {
-    const p = req.params
-    todoapi.update(p.todo_id, p.title, p.completed).then(todo => {
+  router.put('/:todo_id', updateTodo)
+  function updateTodo (ctx, next) {
+    const p = ctx.params.id
+    todoapi.update(ctx.params.id, p.title, p.completed).then(todo => {
       res.json(todo)
     }).catch(e => {
       res.send(e)
@@ -115,7 +127,7 @@ exports.init = function (options) {
   }
 
   // delete a todo and return all todos after deletion
-  router.delete('/api/todos/:todo_id', deleteTodo)
+  router.delete('/:todo_id', deleteTodo)
 
   function deleteTodo (req, res) {
     todoapi.delete(req.params.todo_id).then(r => {
@@ -387,16 +399,24 @@ exports.init = function (options) {
     res.sendfile('index.html');
   });
 
-  router.use(function (req, res) {
-    res.status(404)
-    let body
-    if (req.accepts('json')) {
-      body = {error: 'page not found'}
-    } else {
-      body = 'page not found\n'
-    }
-    res.send(body)
+  router.use((ctx, next) => {
+    return next().then(() => {
+      if (ctx.status === 404 && ctx.request.accepts('json')) {
+        ctx.body = {message: 'page not found'}
+      }
+    })
   })
+
+  //router.use(function (ctx, next) {
+  //  ctx.status = 404
+  //  let body
+  //  if (ctx.accepts('json')) {
+  //    body = {message: 'page not found'}
+  //  } else {
+  //    body = 'page not found\n'
+  //  }
+  //  ctx.body = body
+  //})
 
   app.use(router.routes())
 
