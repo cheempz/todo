@@ -85,7 +85,7 @@ elif [[ "$ARG" = "debug" ]]; then
     # examine another proc's env - cat /proc/17330/environ | tr \\0 \\n
     # or xargs --null --max-args=1 echo < /proc/PID/environ
     echo "setting debug environment variables to standard"
-    export DEBUG=appoptics:error,appoptics:info,appoptics:debug
+    export APPOPTICS_LOG_SETTINGS=error,warn,debug,patching,bind
     #export APPOPTICS_DEBUG_LEVEL=6
     #export APPOPTICS_SHOW_GYP=1
 
@@ -94,12 +94,11 @@ elif [[ "$ARG" = "debug" ]]; then
     # see dist/debug-loggers.js for DEBUG options
     #export DEBUG
 elif [[ "$ARG" = "help" ]]; then
-    echo "help is not implemented. read the code."
+    echo "help is not really implemented. read the code."
     echo "But to test try: '$ node server.js' and (optionally) '$ node tiny-server.js'"
     echo "Each has defaults and command line options documented in the code."
     echo
-    echo "multitest.js creates a load on the server though it's not very evenly"
-    echo "distributed at this point."
+    echo "multiload.js can be used to create a load on the server"
 else
     echo "ERROR $ARG invalid"
 fi
