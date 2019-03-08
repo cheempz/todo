@@ -2,19 +2,23 @@
 
 // create the framework's app/server
 const Koa = require('koa')
+const version = require('koa/package.json').version
 const KoaRouter = require('koa-router')
 const StaticKoaRouter = require('static-koa-router')
 const morgan = require('koa-morgan')
 const bodyParser = require('koa-bodyparser')
+const koaSend = require('koa-send')
 
 const app = new Koa()
 
 const http = require('http')
 const url = require('url')
 const path = require('path')
+const fs = require('fs')
 
 const settings = {log: 'errors'}
 
+exports.config = {version}
 exports.settings = settings
 exports.init = function (options) {
   const staticFiles = options.staticFiles
@@ -28,6 +32,13 @@ exports.init = function (options) {
   // get the middleware ==========================================================
   //==============================================================================
 
+  // handle the static files
+  Object.keys(staticFiles).forEach(k => {
+    const router = new KoaRouter({prefix: k})
+    StaticKoaRouter.Serve(path.join(process.cwd(), k), router)
+    app.use(router.routes())
+  })
+
   // add the logger
   const logger = morgan('dev', {
     skip: function (req, res) {
@@ -38,13 +49,6 @@ exports.init = function (options) {
     }
   })
   app.use(logger)
-
-  // create routes to serve the static files
-  Object.keys(staticFiles).forEach(k => {
-    const router = new KoaRouter({prefix: k})
-    StaticKoaRouter.Serve(path.join(__dirname), router)
-    app.use(router.routes())
-  })
 
   // [json, form] are defaults so no need to set them up
   // parse application / x-www-form-urlencoded
@@ -64,12 +68,12 @@ exports.init = function (options) {
   const router = new KoaRouter()
 
   //
-  app.use((ctx, next) => {
+  app.use(async (ctx, next) => {
     accounting.count()
     return next()
   })
 
-  router.get('/accounting', function (ctx, next) {
+  router.get('/accounting', async function (ctx, next) {
     ctx.body = accounting.get()
     return next()
   })
@@ -78,86 +82,73 @@ exports.init = function (options) {
   // the todo api ================================================================
   //==============================================================================
 
-  const todos = new Router()
-
-  todos.get('/', (ctx, next) => ctx.body = 'get.todos (get-all)')
-  todos.post('/', (ctx, next) => ctx.body = `post.todos (${ctx.request.body.title})`)
-  todos.put('/:id/:z?', (ctx, next) => {console.log(ctx.params); ctx.body = `put.todos.${ctx.params.id}`})
-
-  router.use('/api/todos', todos.routes(), todos.allowedMethods())
-
-
+  // the todos are a separate application
   const todos = new KoaRouter()
+
   // get all todos
-  router.get('/', getAllTodos)
-  function getAllTodos (ctx, next) {
-    return todoapi.getAll().then(todos => {
-      ctx.body = todos
-    }).catch(err => {
-      ctx.status = 500
-      ctx.body = {message: err.message}
-    }).then(next)
+  todos.get('/', getAllTodos)
+  async function getAllTodos (ctx, next) {
+    const todos = await todoapi.getAll()
+    ctx.body = todos
   }
 
   // create a todo and send it back with all todos after creation
   // curl -d 'title=your title' -X POST localhost:8088/api/todos
-  router.post('/', createTodo)
-  function createTodo (ctx, next) {
-    let todo
-    todoapi.create(ctx.request.body.title, false).then(r => {
-      todo = r
-      return todoapi.getAll()
-    }).then(todos => {
-      ctx.body = {todo, todos}
-    }).catch(e => {
-      ctx.status = 500
-      ctx.body = {message: e.message}
-    })
+  todos.post('/', createTodo)
+  async function createTodo (ctx, next) {
+    const todo = await todoapi.create(ctx.request.body.title, false)
+    const todos = await todoapi.getAll()
+    ctx.body = {todo, todos}
   }
 
   // update a todo and return it
-  router.put('/:todo_id', updateTodo)
-  function updateTodo (ctx, next) {
-    const p = ctx.params.id
-    todoapi.update(ctx.params.id, p.title, p.completed).then(todo => {
-      res.json(todo)
-    }).catch(e => {
-      res.send(e)
-    })
+  todos.put('/:id', updateTodo)
+  async function updateTodo (ctx, next) {
+    const b = ctx.request.body
+    const todo = todoapi.update(ctx.params.id, b.title, b.completed)
+    ctx.body = todo
   }
 
   // delete a todo and return all todos after deletion
-  router.delete('/:todo_id', deleteTodo)
-
-  function deleteTodo (req, res) {
-    todoapi.delete(req.params.todo_id).then(r => {
-      return todoapi.getAll()
-    }).then(todos => {
-      res.json(todos)
-    }).catch(e => {
-      res.send(e)
-    })
+  todos.delete('/:id', deleteTodo)
+  async function deleteTodo (ctx, next) {
+    await todoapi.delete(ctx.params.id)
+    const todos = await todoapi.getAll()
+    ctx.body = todos
   }
+
+  // mount the todo api on this url.
+  router.use('/api/todos', todos.routes(), todos.allowedMethods())
 
   //==============================================================================
   // Config information and settings =============================================
   //==============================================================================
   const config = new Requests.Config()
 
-  router.get('/config', function getCfg (req, res) {
+  router.get('/config', async function getCfg (ctx) {
     const r = config.get()
     if (r.status && r.status !== 200) {
-      res.statusCode = r.status
+      ctx.status = r.status
     }
-    res.json(r)
+    ctx.body = r
   })
 
-  router.put('/config/:setting/:value', function putCfg (req, res) {
-    const r = config.set(req.params.setting, req.params.value)
+  router.put('/config/:setting/:value', async function putCfg (ctx) {
+    const r = config.set(ctx.params.setting, ctx.params.value)
     if (r.status && r.status !== 200) {
-      res.statusCode = r.status
+      ctx.status = r.status
     }
-    res.json(r)
+    ctx.body = r
+  })
+
+  const oboe = new Requests.Oboe()
+
+  router.get('/oboe/:what', async function getOboe (ctx) {
+    const r = oboe.get(ctx.params.what)
+    if (r.status && r.status !== 200) {
+      ctx.status = r.status
+    }
+    ctx.body = r
   })
 
   //==============================================================================
@@ -169,30 +160,37 @@ exports.init = function (options) {
   //
   const memory = new Requests.Memory()
 
-  router.get('/memory/:what?', function rss (req, res) {
-    const r = memory.get(req.params.what || 'rss')
+  router.get('/memory/:what?', async function rss (ctx) {
+    const r = memory.get(ctx.params.what || 'rss')
     if (r.status && r.status !== 200) {
-      res.statusCode = r.status
+      ctx.status = r.status
     }
-    res.json(r)
+    ctx.body = r
   })
 
   //
   // delay for a fixed period of time
   //
   const delay = new Requests.Delay()
-  router.get('/delay/:ms', function delayRequest (req, res) {
-    delay.milliseconds(req.params.ms).then(r => {
-      res.json(r)
-    })
+  router.get('/delay/:ms', async function delayRequest (ctx) {
+    const r = await delay.millisecond(ctx.params.ms)
+    ctx.body = r
   })
 
   // generate an error response code
+  router.get('/error/:code', async function error (ctx) {
+    const code = +ctx.params.code || 422
+    ctx.status = code
+    ctx.body = {received: ctx.params.code, set: code}
+  })
 
-  router.get('/error/:code', function error (req, res) {
-    const code = +req.params.code || 422
-    res.statusCode = code
-    res.send(`received "${req.params.code}" set status ${code}\n`)
+  router.get('/read-file', function readFile (ctx) {
+    const r = fs.readFileSync('package.json', 'utf8')
+    ctx.body = shrink(r)
+  })
+
+  router.get('/read-file-fail', async function fileReadError (ctx) {
+    ctx.body = fs.readFileSync('i\'m not there', 'utf8')
   })
 
 
@@ -200,38 +198,41 @@ exports.init = function (options) {
   // custom instrumentation for sync, async, and promises ===============================
   //=====================================================================================
 
-  const customPromise = new Requests.CustomPromise()
-  const customAsync = new Requests.CustomAsync()
   const customSync = new Requests.CustomSync()
+  const customAsync = new Requests.CustomAsync()
+  const customPromise = new Requests.CustomPromise()
 
   const wrap = Requests.CustomPromise.wrapAsync
 
   const cp = require('child_process')
 
-  // how: sync, async, promise
-  // what: ls, delay
-  // x: execute, [r: result | j: json]
+  // how: [sync, async, promise]
+  // what: [ls, delay, readfile, readfail]
+  // x: execute, r: result
   const hows = {
     sync: {
       ls: {x: () => cp.spawnSync('ls', ['-lR']), r: r => r.stdout},
+      readfile: {x: () => fs.readFileSync('appoptics-apm.js'), r: r => r},
+      readfail: {x: () => fs.readFileSync('xyzzy.not-here'), r: r => r},
     },
     async: {
       ls: {x: cb => cp.exec('ls -lR ./node_modules/appoptics-apm', cb), r: r => r[1]},
-      delay: {x: cb => delay.cbMilliseconds(250, cb), j: r => r[0]},
+      readfile: {x: cb => fs.readFile('package.json', 'utf8', cb), r: r => shrink(r[1])},
+      readfail: {x: cb => fs.readFile('i\'m not there', cb), r: r => r[1]},
+      delay: {x: cb => delay.cbMilliseconds(250, cb), r: r => r[0]},
     },
     promise: {
       ls: {x: wrap(cb => cp.exec('ls -lR ./node_modules/appoptics-apm', cb)), r: r => r[1]},
-      delay: {x: () => delay.milliseconds(275), j: r => r},
+      delay: {x: () => delay.milliseconds(275), r: r => r},
     }
   }
 
-  router.get('/custom/:how?/:what?', function custom (req, res) {
-    const how = req.params.how
-    const what = req.params.what
+  router.get('/custom/:how?/:what?/:catch?', async function custom (ctx) {
+    const how = ctx.params.how
+    const what = ctx.params.what
     if (!hows[how] || !hows[how][what]) {
-      res.statusCode = 404
-      res.json(hows)
-      res.end()
+      ctx.status = 404
+      ctx.body = hows
       return
     }
 
@@ -244,14 +245,18 @@ exports.init = function (options) {
 
     const cfg = hows[how][what]
 
-    executor['instrument'](name, cfg.x).then(r => {
-      res[cfg.r ? 'send' : 'json']((cfg.r || cfg.j)(r))
-    }).catch(e => {
-      console.log(e)
-      res.statusCode = 418
-      res.end()
-    })
-
+    if (ctx.params.catch) {
+      try {
+        const r = await executor['instrument'](name, cfg.x)
+        ctx.body = cfg.r(r)
+      } catch (e) {
+        ctx.status = 500
+        ctx.body = {message: e.code}
+      }
+    } else {
+      const r = await executor['instrument'](name, cfg.x)
+      ctx.body = cfg.r(r)
+    }
   })
 
   //=====================================================================================
@@ -394,32 +399,36 @@ exports.init = function (options) {
   //==========================================================================
   // application =============================================================
   //==========================================================================
-  router.get('/', function home (req, res) {
+  router.get('/', async function home (ctx, next) {
     // load the single view file (angular will handle the page changes on the front-end)
-    res.sendfile('index.html');
+    await koaSend(ctx, 'index.html')
   });
 
-  router.use((ctx, next) => {
-    return next().then(() => {
-      if (ctx.status === 404 && ctx.request.accepts('json')) {
-        ctx.body = {message: 'page not found'}
-      }
-    })
+  router.use(async (ctx, next) => {
+    await next()
+    if (ctx.status === 404 && ctx.request.accepts('json')) {
+      ctx.body = {message: 'page not found'}
+    }
   })
-
-  //router.use(function (ctx, next) {
-  //  ctx.status = 404
-  //  let body
-  //  if (ctx.accepts('json')) {
-  //    body = {message: 'page not found'}
-  //  } else {
-  //    body = 'page not found\n'
-  //  }
-  //  ctx.body = body
-  //})
 
   app.use(router.routes())
 
   return app
 
+}
+
+
+function shrink (string) {
+  const lines = string.split('\n')
+  if (lines.length < 5) {
+    return string
+  }
+
+  let count = lines.length - 4;
+  if (lines[lines.length - 1] === '') {
+    count -= 1;
+  }
+
+  lines.splice(2, count, '...')
+  return lines.join('\n')
 }
