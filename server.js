@@ -151,25 +151,25 @@ const options = {
 const frameworkSelection = argv.f || 'express'
 let framework
 let server
-let settings
 
 if (frameworkSelection === 'express') {
   framework = require('./frameworks/express')
-  settings = framework.settings
-
   server = framework.init(options)
+
 } else if (frameworkSelection === 'koa') {
   framework = require('./frameworks/koa')
-  settings = framework.settings
-
   server = framework.init(options)
+
 } else {
   console.error(`invalid framework ${argv.f}`)
   showHelp()
   process.exit(1)
 }
 
-settings.log = log
+const frameworkConfig = framework.config
+const frameworkSettings = framework.settings
+
+frameworkSettings.log = log
 
 //const methodOverride = require('method-override'); // simulate DELETE and PUT (express4)
 
@@ -299,12 +299,14 @@ Promise.all(promises).then(r => {
   console.log(dashes)
   console.log(line)
 
-  console.log(`active: ${serverConfig.appoptics}, bindings: ${serverConfig.bindings}`)
 
+  const fs = frameworkSelection
+  const fv = frameworkConfig.version
   const av = ao.version
   const bv = ao.addon.version
   const ov = ao.addon.Config.getVersionString()
-  console.log(`apm ${av}, bindings ${bv}, oboe ${ov}`)
+  console.log(`${fs} ${fv}, apm ${av}, bindings ${bv}, oboe ${ov}`)
+  console.log(`active: ${serverConfig.appoptics}, bindings: ${serverConfig.bindings}`)
 
   console.log(`sample rate ${ao.sampleRate}, sampleMode ${ao.traceMode}`)
   console.log(dashes)
