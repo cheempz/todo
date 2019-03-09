@@ -2,14 +2,21 @@
 
 // create the framework's app/server
 const Express = require('express')
+const version = require('express/package.json').version
+const bodyParser = require('body-parser')
+
 const app = new Express()
 
 const http = require('http')
 const url = require('url')
 const path = require('path')
+const fs = require('fs')
+
+const {shrink} = require('../lib/utility')
 
 const settings = {log: 'errors'}
 
+exports.config = {version}
 exports.settings = settings
 exports.init = function (options) {
   const staticFiles = options.staticFiles
@@ -23,13 +30,13 @@ exports.init = function (options) {
   // get the middleware ==========================================================
   //==============================================================================
 
-  // logger
-  const morgan = require('morgan')
-
   //handle the static files
   Object.keys(staticFiles).forEach(k => {
-    app.use(k, Express.static(path.join(__dirname, staticFiles[k])))
+    app.use(k, Express.static(path.join(process.cwd(), staticFiles[k])))
   })
+
+  // logger
+  const morgan = require('morgan')
 
   // add the logger
   const logger = morgan('dev', {
@@ -41,9 +48,6 @@ exports.init = function (options) {
     }
   })
   app.use(logger)
-
-  // help parsing request data
-  const bodyParser = require('body-parser')
 
   // parse application / x-www-form-urlencoded
   app.use(bodyParser.urlencoded({'extended': 'true'}))
@@ -57,13 +61,13 @@ exports.init = function (options) {
   // routes ======================================================================
   //==============================================================================
 
-  // api ---------------------------------------------------------------------
   app.all('*', function allRoutes (req, res, next) {
     accounting.count()
     next()
   })
 
-  app.get('/accounting', function (req, res) {
+  app.get('/accounting', function getAccounting (req, res) {
+    //process.nextTick(() => res.json(accounting.get()))
     res.json(accounting.get())
   })
 
@@ -124,7 +128,7 @@ exports.init = function (options) {
   }
 
   //==============================================================================
-  // Config information and settings =============================================
+  // Config information, settings, and stats =====================================
   //==============================================================================
   const config = new Requests.Config()
 
@@ -141,6 +145,19 @@ exports.init = function (options) {
     if (r.status && r.status !== 200) {
       res.statusCode = r.status
     }
+    res.json(r)
+  })
+
+  const oboe = new Requests.Oboe()
+
+  app.get('/oboe/:what', function getOboe (req, res) {
+    const r = oboe.get(req.params.what)
+    if (r.status && r.status !== 200) {
+      res.statusCode = r.status
+      res.end()
+      return
+    }
+    r.framework = 'express'
     res.json(r)
   })
 
@@ -179,14 +196,24 @@ exports.init = function (options) {
     res.send(`received "${req.params.code}" set status ${code}\n`)
   })
 
+  app.get('/read-file', function readFile (req, res) {
+    const r = fs.readFileSync('package.json', 'utf8')
+    res.send(shrink(r))
+  })
+
+  app.get('/read-file-fail', function readFileError (req, res) {
+    const r = fs.readFileSync('i\'m not there')
+    res.send(shrink(r))
+  })
+
 
   //=====================================================================================
   // custom instrumentation for sync, async, and promises ===============================
   //=====================================================================================
 
-  const customPromise = new Requests.CustomPromise()
-  const customAsync = new Requests.CustomAsync()
   const customSync = new Requests.CustomSync()
+  const customAsync = new Requests.CustomAsync()
+  const customPromise = new Requests.CustomPromise()
 
   const wrap = Requests.CustomPromise.wrapAsync
 
@@ -197,19 +224,23 @@ exports.init = function (options) {
   // x: execute, [r: result | j: json]
   const hows = {
     sync: {
-      ls: {x: () => cp.spawnSync('ls', ['-lR']), r: r => r.stdout},
+      ls: {x: () => cp.spawnSync('ls', ['-lR']), r: r => shrink(r.stdout)},
+      readfile: {x: () => fs.readFileSync('package.json', 'utf8'), r: r => shrink(r)},
+      readfail: {x: () => fs.readFileSync('xyzzy.not-here'), r: r => r},
     },
     async: {
-      ls: {x: cb => cp.exec('ls -lR ./node_modules/appoptics-apm', cb), r: r => r[1]},
+      ls: {x: cb => cp.exec('ls -lR ./node_modules/appoptics-apm', cb), r: r => shrink(r[1])},
+      readfile: {x: cb => fs.readFile('package.json', 'utf8', cb), r: r => shrink(r[1])},
+      readfail: {x: cb => fs.readFile('i\'m not there', cb), r: r => r[1]},
       delay: {x: cb => delay.cbMilliseconds(250, cb), j: r => r[0]},
     },
     promise: {
-      ls: {x: wrap(cb => cp.exec('ls -lR ./node_modules/appoptics-apm', cb)), r: r => r[1]},
+      ls: {x: wrap(cb => cp.exec('ls -lR ./node_modules/appoptics-apm', cb)), r: r => shrink(r[1])},
       delay: {x: () => delay.milliseconds(275), j: r => r},
     }
   }
 
-  app.get('/custom/:how?/:what?', function custom (req, res) {
+  app.get('/custom/:how?/:what?/:catch?', function custom (req, res, next) {
     const how = req.params.how
     const what = req.params.what
     if (!hows[how] || !hows[how][what]) {
@@ -231,7 +262,6 @@ exports.init = function (options) {
     executor['instrument'](name, cfg.x).then(r => {
       res[cfg.r ? 'send' : 'json']((cfg.r || cfg.j)(r))
     }).catch(e => {
-      console.log(e)
       res.statusCode = 418
       res.end()
     })

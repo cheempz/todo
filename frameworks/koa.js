@@ -16,6 +16,8 @@ const url = require('url')
 const path = require('path')
 const fs = require('fs')
 
+const {shrink} = require('../lib/utility')
+
 const settings = {log: 'errors'}
 
 exports.config = {version}
@@ -130,6 +132,7 @@ exports.init = function (options) {
     if (r.status && r.status !== 200) {
       ctx.status = r.status
     }
+    r.framework = 'koa'
     ctx.body = r
   })
 
@@ -173,7 +176,7 @@ exports.init = function (options) {
   //
   const delay = new Requests.Delay()
   router.get('/delay/:ms', async function delayRequest (ctx) {
-    const r = await delay.millisecond(ctx.params.ms)
+    const r = await delay.milliseconds(ctx.params.ms)
     ctx.body = r
   })
 
@@ -211,18 +214,18 @@ exports.init = function (options) {
   // x: execute, r: result
   const hows = {
     sync: {
-      ls: {x: () => cp.spawnSync('ls', ['-lR']), r: r => r.stdout},
-      readfile: {x: () => fs.readFileSync('appoptics-apm.js'), r: r => r},
+      ls: {x: () => cp.spawnSync('ls', ['-lR']), r: r => shrink(r.stdout)},
+      readfile: {x: () => fs.readFileSync('appoptics-apm.js'), r: r => shrink(r)},
       readfail: {x: () => fs.readFileSync('xyzzy.not-here'), r: r => r},
     },
     async: {
-      ls: {x: cb => cp.exec('ls -lR ./node_modules/appoptics-apm', cb), r: r => r[1]},
+      ls: {x: cb => cp.exec('ls -lR ./node_modules/appoptics-apm', cb), r: r => shrink(r[1])},
       readfile: {x: cb => fs.readFile('package.json', 'utf8', cb), r: r => shrink(r[1])},
       readfail: {x: cb => fs.readFile('i\'m not there', cb), r: r => r[1]},
       delay: {x: cb => delay.cbMilliseconds(250, cb), r: r => r[0]},
     },
     promise: {
-      ls: {x: wrap(cb => cp.exec('ls -lR ./node_modules/appoptics-apm', cb)), r: r => r[1]},
+      ls: {x: wrap(cb => cp.exec('ls -lR ./node_modules/appoptics-apm', cb)), r: r => shrink(r[1])},
       delay: {x: () => delay.milliseconds(275), r: r => r},
     }
   }
@@ -415,20 +418,4 @@ exports.init = function (options) {
 
   return app
 
-}
-
-
-function shrink (string) {
-  const lines = string.split('\n')
-  if (lines.length < 5) {
-    return string
-  }
-
-  let count = lines.length - 4;
-  if (lines[lines.length - 1] === '') {
-    count -= 1;
-  }
-
-  lines.splice(2, count, '...')
-  return lines.join('\n')
 }
