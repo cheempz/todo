@@ -110,7 +110,7 @@ exports.init = function (options) {
   todos.put('/:id', updateTodo)
   async function updateTodo (ctx, next) {
     const b = ctx.request.body
-    const todo = todoapi.update(ctx.params.id, b.title, b.completed)
+    const todo = await todoapi.update(ctx.params.id, b.title, b.completed)
     ctx.body = todo
   }
 
