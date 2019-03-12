@@ -23,6 +23,9 @@ exports.init = function (options) {
   const Requests = options.Requests
   const accounting = options.accounting
   const todoapi = options.todoapi
+  const host = options.host
+  const httpPort = options.httpPort
+  const httpsPort = options.httpsPort
 
   //server.use(methodOverride());
 
@@ -424,6 +427,46 @@ exports.init = function (options) {
     res.send(body)
   })
 
-  return app
+  //
+  // now get the server listening
+  //
+  const promises = []
+  let httpStatus
+  let httpsStatus
+
+  // it's kind of funky but let the caller decide whether a failure to
+  // listen on a port is OK or not. that's why the promises are always
+  // resolved, not rejected.
+  const p1 = new Promise((resolve, reject) => {
+    function x (...args) {
+      if (args.length && args[0] instanceof Error) {
+        httpStatus = args[0]
+      }
+      resolve(args)
+    }
+    app.listen(httpPort, host).on('listening', x).on('error', x)
+  })
+  promises.push(p1)
+
+  if (httpsPort) {
+    const p2 = new Promise((resolve, reject) => {
+      function x (...args) {
+        if (args.length && args[0] instanceof Error) {
+          httpsStatus = args[0]
+        }
+        resolve(args)
+      }
+      app.listen(httpsPort, host).on('listening', x).on('error', x)
+    })
+    promises.push(p2)
+  }
+
+  return Promise.all(promises).then(r => {
+    return {
+      server: app,
+      httpStatus,
+      httpsStatus,
+    }
+  })
 
 }

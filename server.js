@@ -129,6 +129,20 @@ if (argv.metrics) {
   })
 }
 
+//
+// finally get the ports needed
+//
+let port
+let host
+let httpsPort = 8443;
+if (!argv.heroku) {
+  host = webServerHost.split(':')
+  port = +host[1]
+  host = host[0]
+} else {
+  port = process.env.PORT
+}
+
 //==============================================================================
 // set up the framework ========================================================
 //==============================================================================
@@ -146,19 +160,26 @@ const options = {
   Requests,
   accounting,
   todoapi,
+  host,
+  httpPort: port,
+  httpsPort,
 }
 
 const frameworkSelection = argv.f || 'express'
 let framework
-let server
+let config
 
 if (frameworkSelection === 'express') {
   framework = require('./frameworks/express')
-  server = framework.init(options)
+  config = framework.init(options)
 
 } else if (frameworkSelection === 'koa') {
   framework = require('./frameworks/koa')
-  server = framework.init(options)
+  config = framework.init(options)
+
+} else if (frameworkSelection === 'hapi') {
+  framework = require('./frameworks/hapi')
+  config = framework.init(options)
 
 } else {
   console.error(`invalid framework ${argv.f}`)
@@ -166,10 +187,63 @@ if (frameworkSelection === 'express') {
   process.exit(1)
 }
 
-const frameworkConfig = framework.config
-const frameworkSettings = framework.settings
+config.then(r => {
+  const frameworkConfig = framework.config
+  const frameworkSettings = framework.settings
 
-frameworkSettings.log = log
+  frameworkSettings.log = log
+
+  // check https
+  if (r.httpsStatus) {
+    console.warn(r.httpsStatus)
+    httpsPort = 'NA'
+  }
+
+  // require http
+  if (r.httpStatus) {
+    throw r.httpStatus
+  }
+
+  //const isatty = require('tty').isatty
+  //const tty = [isatty(process.stdout.fd) ? 'on a tty' : 'not a tty']
+  const https = '(https:' + httpsPort + ')'
+  const line = `todo ${version} listening on ${webServerHost} ${https} log: ${log}`
+  const dashes = Buffer.alloc(line.length, '-').toString()
+  console.log(dashes)
+  console.log(line)
+
+
+  const fs = frameworkSelection
+  const fv = frameworkConfig.version
+  const av = ao.version
+  const bv = ao.addon.version
+  const ov = ao.addon.Config.getVersionString()
+  console.log(`${fs} ${fv}, apm ${av}, bindings ${bv}, oboe ${ov}`)
+  console.log(`active: ${serverConfig.appoptics}, bindings: ${serverConfig.bindings}`)
+
+  console.log(`sample rate ${ao.sampleRate}, sampleMode ${ao.traceMode}`)
+  console.log(dashes)
+
+  accounting.startIntervalAverages()
+
+}).catch(e => {
+  console.error(`${frameworkSelection} framework initialization error`, e)
+  process.exit(1)
+})
+
+//==============================================================================
+//==============================================================================
+// get the server running ======================================================
+//==============================================================================
+//==============================================================================
+
+// taken from appoptics test suite. these are not valid for any real
+// servers - only used for local testing.
+const sslInfo = { // eslint-disable-line
+  key: '-----BEGIN RSA PRIVATE KEY-----\nMIICXQIBAAKBgQCsJU2dO/K3oQEh9wo60VC2ajCZjIudc8cqHl9kKNKwc9lP4Rw9\nKWso/+vHhkp6Cmx6Cshm6Hs00rPgZo9HmY//gcj0zHmNbagpmdvAmOudK8l5Npzd\nQwNROKN8EPoKjlFEBMnZj136gF5YAgEN9ydcLtS2TeLmUG1Y3RR6ADjgaQIDAQAB\nAoGBAJTD9/r1n5/JZ+0uTIzf7tx1kGJh7xW2xFtFvDIWhV0wAJDjfT/t10mrQNtA\n1oP5Fh2xy9YC+tZ/cCtw9kluD93Xhzg1Mz6n3h+ZnvnlMb9E0JCgyCznKSS6fCmb\naBz99pPJoR2JThUmcuVtbIYdasqxcHStYEXJH89Ehr85uqrBAkEA31JgRxeuR/OF\n96NJFeD95RYTDeN6JpxJv10k81TvRCxoOA28Bcv5PwDALFfi/LDya9AfZpeK3Nt3\nAW3+fqkYdQJBAMVV37vFQpfl0fmOIkMcZKFEIDx23KHTjE/ZPi9Wfcg4aeR4Y9vt\nm2f8LTaUs/buyrCLK5HzYcX0dGXdnFHgCaUCQDSc47HcEmNBLD67aWyOJULjgHm1\nLgIKsBU1jI8HY5dcHvGVysZS19XQB3Zq/j8qMPLVhZBWA5Ek41Si5WJR1EECQBru\nTUpi8WOpia51J1fhWBpqIbwevJ2ZMVz0WPg85Y2dpVX42Cf7lWnrkIASaz0X+bF+\nTMPuYzmQ0xHT3LGP0cECQQCqt4PLmzx5KtsooiXI5NVACW12GWP78/6uhY6FHUAF\nnJl51PB0Lz8F4HTuHhr+zUr+P7my7X3b00LPog2ixKiO\n-----END RSA PRIVATE KEY-----',
+  cert: '-----BEGIN CERTIFICATE-----\nMIICWDCCAcGgAwIBAgIJAPIHj8StWrbJMA0GCSqGSIb3DQEBCwUAMEUxCzAJBgNV\nBAYTAkFVMRMwEQYDVQQIDApTb21lLVN0YXRlMSEwHwYDVQQKDBhJbnRlcm5ldCBX\naWRnaXRzIFB0eSBMdGQwHhcNMTQwODI3MjM1MzUwWhcNMTQwOTI2MjM1MzUwWjBF\nMQswCQYDVQQGEwJBVTETMBEGA1UECAwKU29tZS1TdGF0ZTEhMB8GA1UECgwYSW50\nZXJuZXQgV2lkZ2l0cyBQdHkgTHRkMIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKB\ngQCsJU2dO/K3oQEh9wo60VC2ajCZjIudc8cqHl9kKNKwc9lP4Rw9KWso/+vHhkp6\nCmx6Cshm6Hs00rPgZo9HmY//gcj0zHmNbagpmdvAmOudK8l5NpzdQwNROKN8EPoK\njlFEBMnZj136gF5YAgEN9ydcLtS2TeLmUG1Y3RR6ADjgaQIDAQABo1AwTjAdBgNV\nHQ4EFgQUTqL/t/yOtpAxKuC9zVm3PnFdRqAwHwYDVR0jBBgwFoAUTqL/t/yOtpAx\nKuC9zVm3PnFdRqAwDAYDVR0TBAUwAwEB/zANBgkqhkiG9w0BAQsFAAOBgQBn1XAm\nAsVdXKr3aiZIgOmw5q+F1lKNl/CHtAPCqwjgntPGhW08WG1ojhCQcNaCp1yfPzpm\niaUwFrgiz+JD+KvxvaBn4pb95A6A3yObADAaAE/ZfbEA397z0RxwTSVU+RFKxzvW\nyICDpugdtxRjkb7I715EjO9R7LkSe5WGzYDp/g==\n-----END CERTIFICATE-----'
+}
+
 
 //const methodOverride = require('method-override'); // simulate DELETE and PUT (express4)
 
@@ -229,88 +303,3 @@ if (argv.metrics || argv.m) {
   })
 }
 // */
-
-
-//==============================================================================
-//==============================================================================
-// get the server running ======================================================
-//==============================================================================
-//==============================================================================
-
-// taken from appoptics test suite. these are not valid for any real
-// servers - only used for local testing.
-const sslInfo = { // eslint-disable-line
-  key: '-----BEGIN RSA PRIVATE KEY-----\nMIICXQIBAAKBgQCsJU2dO/K3oQEh9wo60VC2ajCZjIudc8cqHl9kKNKwc9lP4Rw9\nKWso/+vHhkp6Cmx6Cshm6Hs00rPgZo9HmY//gcj0zHmNbagpmdvAmOudK8l5Npzd\nQwNROKN8EPoKjlFEBMnZj136gF5YAgEN9ydcLtS2TeLmUG1Y3RR6ADjgaQIDAQAB\nAoGBAJTD9/r1n5/JZ+0uTIzf7tx1kGJh7xW2xFtFvDIWhV0wAJDjfT/t10mrQNtA\n1oP5Fh2xy9YC+tZ/cCtw9kluD93Xhzg1Mz6n3h+ZnvnlMb9E0JCgyCznKSS6fCmb\naBz99pPJoR2JThUmcuVtbIYdasqxcHStYEXJH89Ehr85uqrBAkEA31JgRxeuR/OF\n96NJFeD95RYTDeN6JpxJv10k81TvRCxoOA28Bcv5PwDALFfi/LDya9AfZpeK3Nt3\nAW3+fqkYdQJBAMVV37vFQpfl0fmOIkMcZKFEIDx23KHTjE/ZPi9Wfcg4aeR4Y9vt\nm2f8LTaUs/buyrCLK5HzYcX0dGXdnFHgCaUCQDSc47HcEmNBLD67aWyOJULjgHm1\nLgIKsBU1jI8HY5dcHvGVysZS19XQB3Zq/j8qMPLVhZBWA5Ek41Si5WJR1EECQBru\nTUpi8WOpia51J1fhWBpqIbwevJ2ZMVz0WPg85Y2dpVX42Cf7lWnrkIASaz0X+bF+\nTMPuYzmQ0xHT3LGP0cECQQCqt4PLmzx5KtsooiXI5NVACW12GWP78/6uhY6FHUAF\nnJl51PB0Lz8F4HTuHhr+zUr+P7my7X3b00LPog2ixKiO\n-----END RSA PRIVATE KEY-----',
-  cert: '-----BEGIN CERTIFICATE-----\nMIICWDCCAcGgAwIBAgIJAPIHj8StWrbJMA0GCSqGSIb3DQEBCwUAMEUxCzAJBgNV\nBAYTAkFVMRMwEQYDVQQIDApTb21lLVN0YXRlMSEwHwYDVQQKDBhJbnRlcm5ldCBX\naWRnaXRzIFB0eSBMdGQwHhcNMTQwODI3MjM1MzUwWhcNMTQwOTI2MjM1MzUwWjBF\nMQswCQYDVQQGEwJBVTETMBEGA1UECAwKU29tZS1TdGF0ZTEhMB8GA1UECgwYSW50\nZXJuZXQgV2lkZ2l0cyBQdHkgTHRkMIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKB\ngQCsJU2dO/K3oQEh9wo60VC2ajCZjIudc8cqHl9kKNKwc9lP4Rw9KWso/+vHhkp6\nCmx6Cshm6Hs00rPgZo9HmY//gcj0zHmNbagpmdvAmOudK8l5NpzdQwNROKN8EPoK\njlFEBMnZj136gF5YAgEN9ydcLtS2TeLmUG1Y3RR6ADjgaQIDAQABo1AwTjAdBgNV\nHQ4EFgQUTqL/t/yOtpAxKuC9zVm3PnFdRqAwHwYDVR0jBBgwFoAUTqL/t/yOtpAx\nKuC9zVm3PnFdRqAwDAYDVR0TBAUwAwEB/zANBgkqhkiG9w0BAQsFAAOBgQBn1XAm\nAsVdXKr3aiZIgOmw5q+F1lKNl/CHtAPCqwjgntPGhW08WG1ojhCQcNaCp1yfPzpm\niaUwFrgiz+JD+KvxvaBn4pb95A6A3yObADAaAE/ZfbEA397z0RxwTSVU+RFKxzvW\nyICDpugdtxRjkb7I715EjO9R7LkSe5WGzYDp/g==\n-----END CERTIFICATE-----'
-}
-
-let promises
-let port
-let host
-let httpsPort
-if (!argv.heroku) {
-  host = webServerHost.split(':')
-  port = +host[1]
-  host = host[0]
-
-  const p1 = new Promise((resolve, reject) => {
-    function x (...args) {
-      resolve(args)
-    }
-    server.listen(port, host).on('listening', x).on('error', x)
-  })
-  // hardcode the https port
-  httpsPort = 8443
-  const p2 = new Promise((resolve, reject) => {
-    function x (...args) {
-      resolve(args)
-    }
-    server.listen(httpsPort).on('listening', x).on('error', x)
-  })
-  promises = [p1, p2]
-} else {
-  port = process.env.PORT
-  const p1 = new Promise((resolve, reject) => {
-    function x (...args) {
-      resolve(args)
-    }
-    server.listen(port, host).on('listening', x).on('error', x)
-  })
-  promises = [p1]
-}
-
-Promise.all(promises).then(r => {
-  // check https
-  if (r.length === 2) {
-    if (r[1] instanceof Error) {
-      console.log(r[1])
-      httpsPort = 'NA'
-    }
-  }
-  if (r[0] instanceof Error) {
-    throw r[0]
-  }
-
-  //const isatty = require('tty').isatty
-  //const tty = [isatty(process.stdout.fd) ? 'on a tty' : 'not a tty']
-  const https = '(https:' + httpsPort + ')'
-  const line = `todo ${version} listening on ${webServerHost} ${https} log: ${log}`
-  const dashes = Buffer.alloc(line.length, '-').toString()
-  console.log(dashes)
-  console.log(line)
-
-
-  const fs = frameworkSelection
-  const fv = frameworkConfig.version
-  const av = ao.version
-  const bv = ao.addon.version
-  const ov = ao.addon.Config.getVersionString()
-  console.log(`${fs} ${fv}, apm ${av}, bindings ${bv}, oboe ${ov}`)
-  console.log(`active: ${serverConfig.appoptics}, bindings: ${serverConfig.bindings}`)
-
-  console.log(`sample rate ${ao.sampleRate}, sampleMode ${ao.traceMode}`)
-  console.log(dashes)
-
-  accounting.startIntervalAverages()
-
-})
