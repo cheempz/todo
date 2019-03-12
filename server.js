@@ -187,19 +187,21 @@ if (frameworkSelection === 'express') {
   process.exit(1)
 }
 
+// the frameworks return a promise because the initialization
+// is not synchronous.
 config.then(r => {
   const frameworkConfig = framework.config
   const frameworkSettings = framework.settings
 
   frameworkSettings.log = log
 
-  // check https
+  // https is optional
   if (r.httpsStatus) {
-    console.warn(r.httpsStatus)
+    console.warn('https failed to initialize', r.httpsStatus)
     httpsPort = 'NA'
   }
 
-  // require http
+  // http is not optional
   if (r.httpStatus) {
     throw r.httpStatus
   }
