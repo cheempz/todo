@@ -74,6 +74,41 @@ exports.init = function (options) {
     res.json(accounting.get())
   })
 
+
+  //==============================================================================
+  // Config information, settings, and stats =====================================
+  //==============================================================================
+  const config = new Requests.Config()
+
+  app.get('/config', function getCfg (req, res) {
+    const r = config.get()
+    if (r.status && r.status !== 200) {
+      res.statusCode = r.status
+    }
+    res.json(r)
+  })
+
+  app.put('/config/:setting/:value', function putCfg (req, res) {
+    const r = config.set(req.params.setting, req.params.value)
+    if (r.status && r.status !== 200) {
+      res.statusCode = r.status
+    }
+    res.json(r)
+  })
+
+  const oboe = new Requests.Oboe()
+
+  app.get('/oboe/:what', function getOboe (req, res) {
+    const r = oboe.get(req.params.what)
+    if (r.status && r.status !== 200) {
+      res.statusCode = r.status
+      res.end()
+      return
+    }
+    r.framework = 'express'
+    res.json(r)
+  })
+
   //==============================================================================
   // the todo api ================================================================
   //==============================================================================
@@ -129,40 +164,6 @@ exports.init = function (options) {
       res.send(e)
     })
   }
-
-  //==============================================================================
-  // Config information, settings, and stats =====================================
-  //==============================================================================
-  const config = new Requests.Config()
-
-  app.get('/config', function getCfg (req, res) {
-    const r = config.get()
-    if (r.status && r.status !== 200) {
-      res.statusCode = r.status
-    }
-    res.json(r)
-  })
-
-  app.put('/config/:setting/:value', function putCfg (req, res) {
-    const r = config.set(req.params.setting, req.params.value)
-    if (r.status && r.status !== 200) {
-      res.statusCode = r.status
-    }
-    res.json(r)
-  })
-
-  const oboe = new Requests.Oboe()
-
-  app.get('/oboe/:what', function getOboe (req, res) {
-    const r = oboe.get(req.params.what)
-    if (r.status && r.status !== 200) {
-      res.statusCode = r.status
-      res.end()
-      return
-    }
-    r.framework = 'express'
-    res.json(r)
-  })
 
   //==============================================================================
   // Simple little snippets ======================================================
