@@ -27,19 +27,13 @@ exports.init = async function (options) {
   const todoapi = options.todoapi
   const host = options.host
   const httpPort = options.httpPort
-  const httpsPort = options.httpsPort
+  const httpsPort = options.httpsPort // eslint-disable-line
 
   const server = Hapi.server({
     port: httpPort,
     host,
-    debug: {
-      request: ['*'],
-      log: ['*']
-    }
   })
 
-
-  //server.use(methodOverride());
 
   //==============================================================================
   // get the middleware ==========================================================
@@ -62,12 +56,13 @@ exports.init = async function (options) {
   })
 
   server.events.on('response', function logger (req) {
-    console.log(`${req.info.remoteAddress}: ${req.method.toUpperCase()} ${req.url.path} -> ${req.response.statusCode}`)
+    // eslint-disable-next-line
+    console.log(`${req.info.remoteAddress}: ${req.method.toUpperCase()} ${req.url.pathname} -> ${req.response.statusCode}`)
   })
 
 
   // capture each request as it comes in but do nothing other than account for it.
-  // hard won info. api docs are covered. how to do common tasks is not. https://hapijs.com/api#server.ext()
+  // hard won info. lots of api docs. not much on how to do common tasks. https://hapijs.com/api#server.ext()
   server.ext({
     type: 'onRequest',
     method: async function (req, h) {
@@ -80,54 +75,6 @@ exports.init = async function (options) {
   // routes ======================================================================
   //==============================================================================
 
-
-  //==============================================================================
-  // the todo api ================================================================
-  //==============================================================================
-
-
-  // get all todos
-  server.route({
-    method: 'GET',
-    path: '/api/todos',
-    async handler (req, h) {
-      return await todoapi.getAll()
-    }
-  })
-
-  // create a todo and send it back with all todos after creation
-  // curl -d 'title=your title' -X POST localhost:8088/api/todos
-  server.route({
-    method: 'POST',
-    path: '/api/todos',
-    async handler (req, h) {
-      const todo = await todoapi.create(req.payload.title, false)
-      const todos = await todoapi.getAll()
-      return {todo, todos}
-    }
-  })
-
-  // update a todo and return it
-  server.route({
-    method: 'PUT',
-    path: '/api/todos/{id}',
-    async handler (req, h) {
-      const p = req.payload;
-      const todo = await todoapi.update(req.params.id, p.title, p.completed);
-      return todo
-    }
-  })
-
-  // delete a todo and return all todos after deletion
-  server.route({
-    method: 'DELETE',
-    path: '/api/todos/{id}',
-    async handler (req, h) {
-      await todoapi.delete(req.params.id)
-      const todos = await todoapi.getAll()
-      return todos
-    }
-  })
 
   //==============================================================================
   // information and settings ====================================================
@@ -180,6 +127,55 @@ exports.init = async function (options) {
       return r;
     }
   })
+
+  //==============================================================================
+  // the todo api ================================================================
+  //==============================================================================
+
+
+  // get all todos
+  server.route({
+    method: 'GET',
+    path: '/api/todos',
+    async handler (req, h) {
+      return await todoapi.getAll()
+    }
+  })
+
+  // create a todo and send it back with all todos after creation
+  // curl -d 'title=your title' -X POST localhost:8088/api/todos
+  server.route({
+    method: 'POST',
+    path: '/api/todos',
+    async handler (req, h) {
+      const todo = await todoapi.create(req.payload.title, false)
+      const todos = await todoapi.getAll()
+      return {todo, todos}
+    }
+  })
+
+  // update a todo and return it
+  server.route({
+    method: 'PUT',
+    path: '/api/todos/{id}',
+    async handler (req, h) {
+      const p = req.payload;
+      const todo = await todoapi.update(req.params.id, p.title, p.completed);
+      return todo
+    }
+  })
+
+  // delete a todo and return all todos after deletion
+  server.route({
+    method: 'DELETE',
+    path: '/api/todos/{id}',
+    async handler (req, h) {
+      await todoapi.delete(req.params.id)
+      const todos = await todoapi.getAll()
+      return todos
+    }
+  })
+
 
   //==============================================================================
   // Simple little snippets ======================================================
@@ -308,7 +304,7 @@ exports.init = async function (options) {
   })
 
   //=====================================================================================
-  // random more complicated stuff for now.
+  // downstream requests ================================================================
   //=====================================================================================
 
   /*
@@ -335,29 +331,28 @@ exports.init = async function (options) {
 
   // */
 
-  // do a transaction to another server
+  // do a transaction to another server. the url can be specified as a query param
+  // or as JSON.
   server.route({
-    method: 'GET',
-    path: '/downstream/{url}',
+    method: 'POST',
+    path: '/downstream',
     handler: async function downstream (req, h) {
-      debugger
-      const url = `http://localhost:8088/${req.params.url ? req.params.url : ''}`
+      const p = req.payload || {};
+      if (!p.url && !req.query.url) {
+        throw Boom.badRequest('no url')
+      }
+
       const options = {
-        //protocol: 'http:',
-        //port: 8088,
-        //hostname: 'localhost',
-        method: 'get',
-        //url: (req.params.url ? '/' + req.params.url : '/'),
-        url,
+        method: p.method || 'get',
+        url: p.url || req.query.url,
         headers: {
           'Content-Type': 'application/json'
         }
       }
 
-      //return axios(options, {url: options.path})
       return axios(options)
-        .then(req => {
-          return req.data
+        .then(res => {
+          return res.data
         })
         .catch(e => {
           console.log('axios request error', e)
@@ -378,87 +373,27 @@ exports.init = async function (options) {
     method: 'GET',
     path: '/chain',
     handler: async function (req, h) {
-      const q = req.query.target
+      const url = req.query.target
 
-      if (!q) {
+      if (!url) {
         return 'this is the end!\n';
       }
 
-      const options = url.parse(q)
+      const options = {}
+      // propagate the xtrace
       if (req.headers['X-Trace']) {
         options.headers = {'X-Trace': req.headers['X-Trace']}
       }
 
-      // now do the outbound request and get the inbound response
-      const oreq = http.request(options, function (ires) {
-        let body = ''
-        ires.on('data', function (d) {
-          body += d
+      // fetch the supplied url and
+      return axios.get(url, options)
+        .then(res => {
+          const headers = JSON.stringify(res.headers);
+          const body = JSON.stringify(res.data);
+          return [makePrefix(url), headers, `\nbody: ${body}\n`].join('')
         })
-        // on end return it along with the headers
-        ires.on('end', function () {
-          const p = makePrefix(q)
-          const h = JSON.stringify(ires.headers)
-          res.send(p + h + '\nbody: ' + body + '\n')
-        })
-        ires.on('error', function (e) {
-          console.log('GOT ERROR', e)
-        })
-      })
-
-      // if the outbound request failed send the error
-      oreq.on('error', function (err) {
-        console.log('got error', err)
-        res.statusCode = 422
-        res.send(JSON.stringify(err))
-        oreq.end()
-      })
-      oreq.end('')
     }
-
   })
-
-  //router.get('/chain', function chain (req, res) {
-  //
-  //  const q = req.query.target
-  //
-  //  if (!q) {
-  //    res.send('this is the end!\n')
-  //    return
-  //  }
-  //
-  //  const options = url.parse(q)
-  //  if (req.headers['X-Trace']) {
-  //    options.headers = {'X-Trace': req.headers['X-Trace']}
-  //  }
-  //
-  //  // now do the outbound request and get the inbound response
-  //  const oreq = http.request(options, function (ires) {
-  //    let body = ''
-  //    ires.on('data', function (d) {
-  //      body += d
-  //    })
-  //    // on end return it along with the headers
-  //    ires.on('end', function () {
-  //      const p = makePrefix(q)
-  //      const h = JSON.stringify(ires.headers)
-  //      res.send(p + h + '\nbody: ' + body + '\n')
-  //    })
-  //    ires.on('error', function (e) {
-  //      console.log('GOT ERROR', e)
-  //    })
-  //  })
-  //
-  //  // if the outbound request failed send the error
-  //  oreq.on('error', function (err) {
-  //    console.log('got error', err)
-  //    res.statusCode = 422
-  //    res.send(JSON.stringify(err))
-  //    oreq.end()
-  //  })
-  //  oreq.end('')
-  //
-  //})
 
   //
   // version of chain that uses request() instead of
@@ -475,42 +410,29 @@ exports.init = async function (options) {
           'user-agent': 'request'
         }
       }
-      function callback (err, response, body) {
-        if (!err && response.statusCode === 200) {
-          const p = makePrefix(req.query.target)
-          const h = JSON.stringify(response.headers)
-          res.send(p + h + '\nbody: ' + body + '\n')
+      return new Promise((resolve, reject) => {
+        function callback (err, response, body) {
+          if (!err) {
+            const p = makePrefix(req.query.target)
+            const h = JSON.stringify(response.headers)
+            resolve(p + h + '\nbody: ' + body + '\n')
+          } else {
+            throw err
+          }
         }
-      }
 
-      request(options, callback)
+        request(options, callback)
+      })
     }
   })
 
-  //router.get('/chain2', function chain2 (req, res) {
-  //
-  //  const request = require('request')
-  //  const options = {
-  //    url: url.parse(req.query.target),
-  //    headers: {
-  //      'user-agent': 'request'
-  //    }
-  //  }
-  //  function callback (err, response, body) {
-  //    if (!err && response.statusCode === 200) {
-  //      const p = makePrefix(req.query.target)
-  //      const h = JSON.stringify(response.headers)
-  //      res.send(p + h + '\nbody: ' + body + '\n')
-  //    }
-  //  }
-  //
-  //  request(options, callback)
-  //})
-
+  //==========================================================================
   //==========================================================================
   // application =============================================================
   //==========================================================================
+  //==========================================================================
 
+  // the angular app fetches / and uses the todo api.
   server.route({
     method: 'GET',
     path: '/',
@@ -521,13 +443,7 @@ exports.init = async function (options) {
     }
   })
 
-  //router.use(async (ctx, next) => {
-  //  await next()
-  //  if (ctx.status === 404 && ctx.request.accepts('json')) {
-  //    ctx.body = {message: 'page not found'}
-  //  }
-  //})
-
+  // start the server and return it's promise
   return server.start().then(r => {
     return {
       server,
