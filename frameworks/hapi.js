@@ -8,6 +8,7 @@ const Inert = require('inert')
 
 const http = require('http')
 const url = require('url')
+const axios = require('axios')
 const path = require('path')
 const fs = require('fs')
 const Boom = require('boom')
@@ -31,6 +32,10 @@ exports.init = async function (options) {
   const server = Hapi.server({
     port: httpPort,
     host,
+    debug: {
+      request: ['*'],
+      log: ['*']
+    }
   })
 
 
@@ -46,7 +51,6 @@ exports.init = async function (options) {
 
   // hardcoded one level of directory. consider making the value an array of directories?
   Object.keys(staticFiles).forEach(k => {
-    console.log(path.join(k, '{directory}/{filename}'))
     server.route({
       method: 'GET',
       path: `${k}/{directory}/{filename}`,
@@ -58,36 +62,24 @@ exports.init = async function (options) {
   })
 
   server.events.on('response', function logger (req) {
-    req.log(`${req.info.remoteAddress}: ${req.method.toUpperCase()} ${req.url.path} -> ${req.response.statusCode}`)
+    console.log(`${req.info.remoteAddress}: ${req.method.toUpperCase()} ${req.url.path} -> ${req.response.statusCode}`)
   })
 
-  // [json, form] are defaults so no need to set them up
-  // parse application / x-www-form-urlencoded
-  //app.use(bodyParser.urlencoded({'extended': 'true'}))
 
-  // parse application/vnd.api+json as json
-  //app.use(bodyParser({
-  //  enableType: ['json', 'form', 'text'],
-  //  extendTypes: {json: ['application/vnd.api+json']}
-  //}))
-
+  // capture each request as it comes in but do nothing other than account for it.
+  // hard won info. api docs are covered. how to do common tasks is not. https://hapijs.com/api#server.ext()
+  server.ext({
+    type: 'onRequest',
+    method: async function (req, h) {
+      accounting.count();
+      return h.continue;
+    }
+  })
 
   //==============================================================================
   // routes ======================================================================
   //==============================================================================
 
-
-  server.events.on('request', function countRequest () {
-    accounting.count()
-  })
-
-  server.route({
-    method: 'GET',
-    path: '/accounting',
-    handler (req, h) {
-      return accounting.get()
-    }
-  })
 
   //==============================================================================
   // the todo api ================================================================
@@ -102,11 +94,6 @@ exports.init = async function (options) {
       return await todoapi.getAll()
     }
   })
-  //todos.get('/', getAllTodos)
-  //async function getAllTodos (ctx, next) {
-  //  const todos = await todoapi.getAll()
-  //  ctx.body = todos
-  //}
 
   // create a todo and send it back with all todos after creation
   // curl -d 'title=your title' -X POST localhost:8088/api/todos
@@ -119,12 +106,6 @@ exports.init = async function (options) {
       return {todo, todos}
     }
   })
-  //todos.post('/', createTodo)
-  //async function createTodo (ctx, next) {
-  //  const todo = await todoapi.create(ctx.request.body.title, false)
-  //  const todos = await todoapi.getAll()
-  //  ctx.body = {todo, todos}
-  //}
 
   // update a todo and return it
   server.route({
@@ -136,12 +117,6 @@ exports.init = async function (options) {
       return todo
     }
   })
-  //todos.put('/:id', updateTodo)
-  //async function updateTodo (ctx, next) {
-  //  const b = ctx.request.body
-  //  const todo = await todoapi.update(ctx.params.id, b.title, b.completed)
-  //  ctx.body = todo
-  //}
 
   // delete a todo and return all todos after deletion
   server.route({
@@ -154,19 +129,18 @@ exports.init = async function (options) {
     }
   })
 
-  //todos.delete('/:id', deleteTodo)
-  //async function deleteTodo (ctx, next) {
-  //  await todoapi.delete(ctx.params.id)
-  //  const todos = await todoapi.getAll()
-  //  ctx.body = todos
-  //}
-
-  // mount the todo api on this url.
-  //router.use('/api/todos', todos.routes(), todos.allowedMethods())
-
   //==============================================================================
-  // Config information and settings =============================================
+  // information and settings ====================================================
   //==============================================================================
+
+  server.route({
+    method: 'GET',
+    path: '/accounting',
+    handler (req, h) {
+      return accounting.get()
+    }
+  })
+
   const config = new Requests.Config()
 
   server.route({
@@ -180,14 +154,6 @@ exports.init = async function (options) {
       return r;
     }
   })
-  //router.get('/config', async function getCfg (ctx) {
-  //  const r = config.get()
-  //  if (r.status && r.status !== 200) {
-  //    ctx.status = r.status
-  //  }
-  //  r.framework = 'koa'
-  //  ctx.body = r
-  //})
 
   server.route({
     method: 'PUT',
@@ -200,13 +166,6 @@ exports.init = async function (options) {
       return r;
     }
   })
-  //router.put('/config/:setting/:value', async function putCfg (ctx) {
-  //  const r = config.set(ctx.params.setting, ctx.params.value)
-  //  if (r.status && r.status !== 200) {
-  //    ctx.status = r.status
-  //  }
-  //  ctx.body = r
-  //})
 
   const oboe = new Requests.Oboe()
 
@@ -221,13 +180,6 @@ exports.init = async function (options) {
       return r;
     }
   })
-  //router.get('/oboe/:what', async function getOboe (ctx) {
-  //  const r = oboe.get(ctx.params.what)
-  //  if (r.status && r.status !== 200) {
-  //    ctx.status = r.status
-  //  }
-  //  ctx.body = r
-  //})
 
   //==============================================================================
   // Simple little snippets ======================================================
@@ -239,7 +191,7 @@ exports.init = async function (options) {
   const memory = new Requests.Memory()
   server.route({
     method: 'GET',
-    path: '/memory/{what}',
+    path: '/memory/{what?}',
     handler: async function getMemory (req, h) {
       const r = memory.get(req.params.what || 'rss')
       if (r.status && r.status !== 200) {
@@ -249,31 +201,18 @@ exports.init = async function (options) {
     }
   })
 
-  //router.get('/memory/:what?', async function rss (ctx) {
-  //  const r = memory.get(ctx.params.what || 'rss')
-  //  if (r.status && r.status !== 200) {
-  //    ctx.status = r.status
-  //  }
-  //  ctx.body = r
-  //})
-
   //
   // delay for a fixed period of time
   //
   const delay = new Requests.Delay()
   server.route({
     method: 'GET',
-    path: '/delay/{ms}',
+    path: '/delay/{ms?}',
     handler: async function delayRequest (req, h) {
       const r = await delay.milliseconds(req.params.ms)
       return r
     }
   })
-
-  //router.get('/delay/:ms', async function delayRequest (ctx) {
-  //  const r = await delay.milliseconds(ctx.params.ms)
-  //  ctx.body = r
-  //})
 
   // generate an error response code
   server.route({
@@ -285,12 +224,6 @@ exports.init = async function (options) {
     }
   })
 
-  //router.get('/error/:code', async function error (ctx) {
-  //  const code = +ctx.params.code || 422
-  //  ctx.status = code
-  //  ctx.body = {received: ctx.params.code, set: code}
-  //})
-
   server.route({
     method: 'GET',
     path: '/read-file',
@@ -299,10 +232,6 @@ exports.init = async function (options) {
       return shrink(r)
     }
   })
-  //router.get('/read-file', function readFile (ctx) {
-  //  const r = fs.readFileSync('package.json', 'utf8')
-  //  ctx.body = shrink(r)
-  //})
 
   server.route({
     method: 'GET',
@@ -311,9 +240,6 @@ exports.init = async function (options) {
       return fs.readFileSync('i\'m not there', 'utf8');
     }
   })
-  //router.get('/read-file-fail', async function fileReadError (ctx) {
-  //  ctx.body = fs.readFileSync('i\'m not there', 'utf8')
-  //})
 
 
   //=====================================================================================
@@ -380,37 +306,6 @@ exports.init = async function (options) {
       }
     }
   })
-  //router.get('/custom/:how?/:what?/:catch?', async function custom (ctx) {
-  //  const how = ctx.params.how
-  //  const what = ctx.params.what
-  //  if (!hows[how] || !hows[how][what]) {
-  //    ctx.status = 404
-  //    ctx.body = hows
-  //    return
-  //  }
-  //
-  //  const executor = {
-  //    sync: customSync,
-  //    async: customAsync,
-  //    promise: customPromise,
-  //  }[how]
-  //  const name = `custom-${how}-${what}`
-  //
-  //  const cfg = hows[how][what]
-  //
-  //  if (ctx.params.catch) {
-  //    try {
-  //      const r = await executor['instrument'](name, cfg.x)
-  //      ctx.body = cfg.r(r)
-  //    } catch (e) {
-  //      ctx.status = 500
-  //      ctx.body = {message: e.code}
-  //    }
-  //  } else {
-  //    const r = await executor['instrument'](name, cfg.x)
-  //    ctx.body = cfg.r(r)
-  //  }
-  //})
 
   //=====================================================================================
   // random more complicated stuff for now.
@@ -445,78 +340,37 @@ exports.init = async function (options) {
     method: 'GET',
     path: '/downstream/{url}',
     handler: async function downstream (req, h) {
+      debugger
+      const url = `http://localhost:8088/${req.params.url ? req.params.url : ''}`
       const options = {
-        protocol: 'http:',
-        port: 8881,
-        hostname: 'localhost',
-        method: 'post',
-        path: (req.params.url ? '/' + req.params.url : '/'),
+        //protocol: 'http:',
+        //port: 8088,
+        //hostname: 'localhost',
+        method: 'get',
+        //url: (req.params.url ? '/' + req.params.url : '/'),
+        url,
         headers: {
           'Content-Type': 'application/json'
         }
       }
 
-      const oreq = http.request(options, function (ires) {
-        let body = ''
-        ires.on('data', function (d) {
-          body += d
+      //return axios(options, {url: options.path})
+      return axios(options)
+        .then(req => {
+          return req.data
         })
-        // and on end log it
-        ires.on('end', function () {
-          res.send(body)
+        .catch(e => {
+          console.log('axios request error', e)
+          return {error: e, message: e.message}
         })
-        ires.on('error', function (e) {
-          console.log('GOT ERROR', e)
-        })
-      })
-
-      oreq.on('error', function (err) {
-        console.log('got error', err)
-      })
-      oreq.write(JSON.stringify({url: options.path}))
-      oreq.end()
     }
   })
-
-  //router.get('/downstream/:url', function downstream (req, res) {
-  //
-  //  const options = {
-  //    protocol: 'http:',
-  //    port: 8881,
-  //    hostname: 'localhost',
-  //    method: 'post',
-  //    path: (req.params.url ? '/' + req.params.url : '/'),
-  //    headers: {
-  //      'Content-Type': 'application/json'
-  //    }
-  //  }
-  //
-  //  const oreq = http.request(options, function (ires) {
-  //    let body = ''
-  //    ires.on('data', function (d) {
-  //      body += d
-  //    })
-  //    // and on end log it
-  //    ires.on('end', function () {
-  //      res.send(body)
-  //    })
-  //    ires.on('error', function (e) {
-  //      console.log('GOT ERROR', e)
-  //    })
-  //  })
-  //
-  //  oreq.on('error', function (err) {
-  //    console.log('got error', err)
-  //  })
-  //  oreq.write(JSON.stringify({url: options.path}))
-  //  oreq.end()
-  //
-  //})
 
 
   function makePrefix (URL) {
     return '--- response from ' + URL + ' ---\nheaders: '
   }
+
   //
   // now make a chained URL
   //
@@ -527,8 +381,7 @@ exports.init = async function (options) {
       const q = req.query.target
 
       if (!q) {
-        res.send('this is the end!\n')
-        return
+        return 'this is the end!\n';
       }
 
       const options = url.parse(q)
