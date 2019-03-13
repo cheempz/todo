@@ -84,6 +84,39 @@ exports.init = function (options) {
   })
 
   //==============================================================================
+  // Config information and settings =============================================
+  //==============================================================================
+  const config = new Requests.Config()
+
+  router.get('/config', async function getCfg (ctx) {
+    const r = config.get()
+    if (r.status && r.status !== 200) {
+      ctx.status = r.status
+    }
+    r.framework = 'koa'
+    ctx.body = r
+  })
+
+  router.put('/config/:setting/:value', async function putCfg (ctx) {
+    const r = config.set(ctx.params.setting, ctx.params.value)
+    if (r.status && r.status !== 200) {
+      ctx.status = r.status
+    }
+    ctx.body = r
+  })
+
+  const oboe = new Requests.Oboe()
+
+  router.get('/oboe/:what', async function getOboe (ctx) {
+    const r = oboe.get(ctx.params.what)
+    if (r.status && r.status !== 200) {
+      ctx.status = r.status
+    }
+    ctx.body = r
+  })
+
+
+  //==============================================================================
   // the todo api ================================================================
   //==============================================================================
 
@@ -124,38 +157,6 @@ exports.init = function (options) {
 
   // mount the todo api on this url.
   router.use('/api/todos', todos.routes(), todos.allowedMethods())
-
-  //==============================================================================
-  // Config information and settings =============================================
-  //==============================================================================
-  const config = new Requests.Config()
-
-  router.get('/config', async function getCfg (ctx) {
-    const r = config.get()
-    if (r.status && r.status !== 200) {
-      ctx.status = r.status
-    }
-    r.framework = 'koa'
-    ctx.body = r
-  })
-
-  router.put('/config/:setting/:value', async function putCfg (ctx) {
-    const r = config.set(ctx.params.setting, ctx.params.value)
-    if (r.status && r.status !== 200) {
-      ctx.status = r.status
-    }
-    ctx.body = r
-  })
-
-  const oboe = new Requests.Oboe()
-
-  router.get('/oboe/:what', async function getOboe (ctx) {
-    const r = oboe.get(ctx.params.what)
-    if (r.status && r.status !== 200) {
-      ctx.status = r.status
-    }
-    ctx.body = r
-  })
 
   //==============================================================================
   // Simple little snippets ======================================================
@@ -294,38 +295,43 @@ exports.init = function (options) {
   // */
 
   // do a transaction to another server
-  router.get('/downstream/:url', function downstream (req, res) {
+  router.get('/downstream/:url', async function downstream (ctx) {
 
     const options = {
       protocol: 'http:',
       port: 8881,
       hostname: 'localhost',
       method: 'post',
-      path: (req.params.url ? '/' + req.params.url : '/'),
+      path: (ctx.params.url ? '/' + ctx.params.url : '/'),
       headers: {
         'Content-Type': 'application/json'
       }
     }
 
-    const oreq = http.request(options, function (ires) {
-      let body = ''
-      ires.on('data', function (d) {
-        body += d
+    return new Promise((resolve, reject) => {
+      const oreq = http.request(options, function (ires) {
+        let body = ''
+        ires.on('data', function (d) {
+          body += d
+        })
+        // and on end log it
+        ires.on('end', function () {
+          ctx.body =  body
+          resolve()
+        })
+        ires.on('error', function (e) {
+          console.log('GOT ERROR', e)
+          reject(e)
+        })
       })
-      // and on end log it
-      ires.on('end', function () {
-        res.send(body)
-      })
-      ires.on('error', function (e) {
-        console.log('GOT ERROR', e)
-      })
-    })
 
-    oreq.on('error', function (err) {
-      console.log('got error', err)
+      oreq.on('error', function (err) {
+        console.log('got error', err)
+        reject(err)
+      })
+      oreq.write(JSON.stringify({url: options.path}))
+      oreq.end()
     })
-    oreq.write(JSON.stringify({url: options.path}))
-    oreq.end()
 
   })
 
@@ -336,70 +342,80 @@ exports.init = function (options) {
   //
   // now make a chained URL
   //
-  router.get('/chain', function chain (req, res) {
+  router.get('/chain', async function chain (ctx) {
 
-    const q = req.query.target
+    const q = ctx.query.target
 
     if (!q) {
-      res.send('this is the end!\n')
-      return
+      ctx.body = 'this is the end!\n';
+      return;
     }
 
-    const options = url.parse(q)
-    if (req.headers['X-Trace']) {
-      options.headers = {'X-Trace': req.headers['X-Trace']}
+    const options = url.parse(q);
+    if (ctx.request.headers['X-Trace']) {
+      options.headers = {'X-Trace': ctx.request.headers['X-Trace']}
     }
 
-    // now do the outbound request and get the inbound response
-    const oreq = http.request(options, function (ires) {
-      let body = ''
-      ires.on('data', function (d) {
-        body += d
+    return new Promise((resolve, reject) => {
+      // now do the outbound request and get the inbound response
+      const oreq = http.request(options, function (ires) {
+        let body = ''
+        ires.on('data', function (d) {
+          body += d
+        })
+        // on end return it along with the headers
+        ires.on('end', function () {
+          const p = makePrefix(q)
+          const h = JSON.stringify(ires.headers)
+          ctx.body = p + h + '\nbody: ' + body + '\n';
+          resolve()
+        })
+        ires.on('error', function (e) {
+          console.log('GOT ERROR', e)
+          reject(e)
+        })
       })
-      // on end return it along with the headers
-      ires.on('end', function () {
-        const p = makePrefix(q)
-        const h = JSON.stringify(ires.headers)
-        res.send(p + h + '\nbody: ' + body + '\n')
-      })
-      ires.on('error', function (e) {
-        console.log('GOT ERROR', e)
-      })
-    })
 
-    // if the outbound request failed send the error
-    oreq.on('error', function (err) {
-      console.log('got error', err)
-      res.statusCode = 422
-      res.send(JSON.stringify(err))
-      oreq.end()
-    })
-    oreq.end('')
+      // if the outbound request failed send the error
+      oreq.on('error', function (err) {
+        console.log('got error', err)
+        ctx.status = 422
+        ctx.body = err
+        oreq.end()
+      })
+      oreq.end('')
 
+    })
   })
+
 
   //
   // version of chain that uses request() instead of
   // http.request()
   //
-  router.get('/chain2', function chain2 (req, res) {
+  router.get('/chain2', async function chain2 (ctx) {
 
     const request = require('request')
     const options = {
-      url: url.parse(req.query.target),
+      url: url.parse(ctx.query.target),
       headers: {
         'user-agent': 'request'
       }
     }
-    function callback (err, response, body) {
-      if (!err && response.statusCode === 200) {
-        const p = makePrefix(req.query.target)
-        const h = JSON.stringify(response.headers)
-        res.send(p + h + '\nbody: ' + body + '\n')
-      }
-    }
 
-    request(options, callback)
+    return new Promise((resolve, reject) => {
+      function callback (err, response, body) {
+        if (err) {
+          reject(err);
+          return;
+        }
+        const p = makePrefix(ctx.query.target)
+        const h = JSON.stringify(response.headers)
+        ctx.body = p + h + '\nbody: ' + body + '\n';
+      }
+
+      request(options, callback)
+    })
   })
 
   //==========================================================================
