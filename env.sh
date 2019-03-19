@@ -1,14 +1,20 @@
 ARG=$1
 PARAM=$2
 
-if [[ -z "$AO_TOKEN_STG" ]]; then
-    echo "AO_TOKEN_STG must be defined and contain a valid token"
-    echo "for accessing collector-stg.appoptics.com"
+token=$AO_TOKEN_STG
+if [ "$ARG" = "prod" ]; then
+    if [ -z "$AO_TOKEN_PROD" ]; then
+        echo "AO_TOKEN_PROD must be defined for the \"prod\" argument"
+        return
+    fi
+    token=$AO_TOKEN_PROD
+elif [ -z "$AO_TOKEN_STG" ]; then
+    echo "AO_TOKEN_STG must be defined for any argument other than \"prod\""
     return
 fi
 
 # define this for all options
-export APPOPTICS_SERVICE_KEY=${AO_TOKEN_STG}:${AO_SERVICE_NAME:-node-todo-test}
+export APPOPTICS_SERVICE_KEY=${token}:${AO_SERVICE_NAME:-node-todo-test}
 echo Defined service as $APPOPTICS_SERVICE_KEY
 
 if [[ -z "$ARG" ]]; then
@@ -31,6 +37,7 @@ elif [[ "$ARG" = "java" ]]; then
         # appoptics at java-collector in containers
         export TODO_COLLECTOR=java-collector:12222
         export TODO_TRUSTEDPATH=/todo/certs/java-collector.crt
+        export APPOPTICS_TRUSTEDPATH=/home/bruce/solarwinds/oboe-test/benchmark/node/collectors/java-collector/test-collector.crt
     else
         echo Invalid parameter "$PARAM" for argument "java"
     fi
@@ -56,7 +63,12 @@ elif [[ "$ARG" = "stg" ]]; then
     unset TODO_TRUSTEDPATH
     unset TODO_COLLECTOR
 elif [[ "$ARG" = "prod" ]]; then
-    echo "ERROR: prod is not yet implemented"
+    echo "setting prod environment variables"
+    export APPOPTICS_REPORTER=ssl
+    export APPOPTICS_COLLECTOR=collector.appoptics.com
+    unset APPOPTICS_TRUSTEDPATH
+    unset TODO_TRUSTEDPATH
+    unset TODO_COLLECTOR
 elif [[ "$ARG" = "bindings" ]]; then
     # use these to provide authentication and specify an alternate branch/tag
     # for the install-appoptics-bindings.js script.
