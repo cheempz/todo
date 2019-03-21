@@ -414,7 +414,7 @@ exports.init = function (options) {
   //==========================================================================
   app.get('/', function home (req, res) {
     // load the single view file (angular will handle the page changes on the front-end)
-    res.sendFile('index.html');
+    res.sendFile(process.cwd() + '/index.html');
   });
 
   app.use(function (req, res) {
