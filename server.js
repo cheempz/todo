@@ -267,41 +267,4 @@ function customExpressTxName (req, res) {
   return customTxname
 }
 
-//
-// appoptics settings
-//
-let rate = ('rate' in argv) ? +argv.rate : 1000000
-
-// also allow shorthand -r which does 0-100 (interpreted as percent)
-// this overrides a --rate setting.
-if ('r' in argv) rate = +argv.r * 10000
-ao.sampleRate = rate
-
-const minutesToMs = m => m * 60000
-//
-// if supplied metrics must be a valid appoptics token (not service key)
-//
-if (argv.metrics || argv.m) {
-  const Metrics = require('./lib/metrics')
-
-  // set key, endpoint, and default tags
-  const m = new Metrics(
-    argv.metrics,
-    'https://api.appoptics.com/v1/measurements',
-    {image_name: `${hostname}-${ao.version}`}
-  )
-
-  const ctx = m.sendOnInterval(5000, () => {
-    return {metrics: {
-      'todo.memory.rss': process.memoryUsage().rss,
-      'todo.cpu.perTransaction': accounting.get().cpuUserPerTx[minutesToMs(1)],
-      'todo.apm.lastRate': accounting.get().lastRate,
-    }}
-  })
-
-  // could work on restarting but not sure why
-  ctx.promise.catch(e => {
-    console.log(e)
-  })
-}
 // */
