@@ -6,7 +6,6 @@ const Hapi = require('hapi')
 const version = require('hapi/package.json').version
 const Inert = require('inert')
 
-const http = require('http')
 const url = require('url')
 const axios = require('axios')
 const path = require('path')
