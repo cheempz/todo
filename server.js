@@ -220,10 +220,9 @@ config.then(r => {
   console.log(dashes)
   console.log(line)
 
-
   const fs = frameworkSelection
   const fv = frameworkConfig.version
-  const av = ao.version
+  const av = `${ao.version}${ao.cfg.enabled ? '' : ' (disabled)'}`;
   const bv = ao.addon.version
   const ov = ao.addon.Config.getVersionString()
   console.log(`${fs} ${fv} ${logger} (logging ${logLevel})`);
