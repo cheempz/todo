@@ -15,7 +15,7 @@ const Boom = require('boom')
 
 const {shrink} = require('../lib/utility')
 
-const settings = {log: 'errors'}
+const settings = {logLevel: 'errors'}
 
 exports.config = {version}
 exports.settings = settings
@@ -27,6 +27,7 @@ exports.init = async function (options) {
   const host = options.host
   const httpPort = options.httpPort
   const httpsPort = options.httpsPort // eslint-disable-line
+  const traceToken = options.traceToken;
 
   const server = Hapi.server({
     port: httpPort,
@@ -56,7 +57,7 @@ exports.init = async function (options) {
 
   server.events.on('response', function logger (req) {
     // eslint-disable-next-line
-    console.log(`${req.info.remoteAddress}: ${req.method.toUpperCase()} ${req.url.pathname} -> ${req.response.statusCode}`)
+    console.log(`${req.info.remoteAddress}: ${req.method.toUpperCase()} ${req.url.pathname} -> ${req.response.statusCode} ${traceToken()}`)
   })
 
 

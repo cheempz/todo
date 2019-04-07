@@ -14,7 +14,7 @@ const fs = require('fs')
 
 const {shrink} = require('../lib/utility')
 
-const settings = {log: 'errors'}
+const settings = {logLevel: 'errors'}
 
 exports.config = {version}
 exports.settings = settings
@@ -26,6 +26,8 @@ exports.init = function (options) {
   const host = options.host
   const httpPort = options.httpPort
   const httpsPort = options.httpsPort
+  const traceToken = options.traceToken;
+  const loggingPackage = options.logger;
 
   //server.use(methodOverride());
 
@@ -38,19 +40,34 @@ exports.init = function (options) {
     app.use(k, Express.static(path.join(process.cwd(), staticFiles[k])))
   })
 
-  // logger
-  const morgan = require('morgan')
+  //
+  // one of the supported logging packages
+  //
+  if (!loggingPackage || loggingPackage === 'morgan') {
+    const morgan = require('morgan')
+    const logFormat = ':method :url :status :res[content-length] :trace-id - :response-time ms';
+    morgan.token('trace-id', function (req, res) {return traceToken();});
 
-  // add the logger
-  const logger = morgan('dev', {
-    skip: function (req, res) {
-      if (settings.log === 'errors') {
-        return res.statusCode < 400 || res.statusCode === 512
+    // add the logger
+    const logger = morgan(logFormat, {
+      skip: function (req, res) {
+        if (settings.logLevel === 'errors') {
+          return res.statusCode < 400 || res.statusCode === 512
+        }
+        return false
       }
-      return false
-    }
-  })
-  app.use(logger)
+    })
+    app.use(logger)
+  } else if (loggingPackage === 'pino') {
+    const pino = require('express-pino-logger');
+    app.use(pino());
+  } else if (loggingPackage === 'winston') {
+    const winston = require('winston');
+    const expressWinston = require('express-winston');
+    app.use(expressWinston.logger({
+      transports: [new winston.transports.Console()]
+    }));
+  }
 
   // parse application / x-www-form-urlencoded
   app.use(bodyParser.urlencoded({'extended': 'true'}))

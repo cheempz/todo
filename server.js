@@ -77,7 +77,8 @@ const mongoHost = defaultMissing(argv.be_ip || argv.d, 27017)
 const webServerHost = defaultMissing(argv.fe_ip || argv.w, 8088)
 
 // get log setttings
-const log = argv.log
+const logger = argv.logger;
+const logLevel = argv['log-level'];
 
 //
 // appoptics settings
@@ -155,6 +156,9 @@ const staticFiles = {
 // get the lower level api that knows nothing of web server frameworks
 const todoapi = new Requests.TodoApi(mongoHost)
 
+// get the Event.last formatter for insertion into logs
+const traceToken = ao.getFormattedTraceId;
+
 const options = {
   staticFiles,
   Requests,
@@ -163,6 +167,8 @@ const options = {
   host,
   httpPort: port,
   httpsPort,
+  traceToken,
+  logger,
 }
 
 const frameworkSelection = argv.f || 'express'
@@ -193,7 +199,7 @@ config.then(r => {
   const frameworkConfig = framework.config
   const frameworkSettings = framework.settings
 
-  frameworkSettings.log = log
+  frameworkSettings.logLevel = logLevel;
 
   // https is optional
   if (r.httpsStatus) {
@@ -209,7 +215,7 @@ config.then(r => {
   //const isatty = require('tty').isatty
   //const tty = [isatty(process.stdout.fd) ? 'on a tty' : 'not a tty']
   const https = '(https:' + httpsPort + ')'
-  const line = `todo ${version} listening on ${webServerHost} ${https} log: ${log}`
+  const line = `todo ${version} listening on ${webServerHost} ${https}`;
   const dashes = Buffer.alloc(line.length, '-').toString()
   console.log(dashes)
   console.log(line)
@@ -220,8 +226,8 @@ config.then(r => {
   const av = ao.version
   const bv = ao.addon.version
   const ov = ao.addon.Config.getVersionString()
-  console.log(`${fs} ${fv}, apm ${av}, bindings ${bv}, oboe ${ov}`)
-  console.log(`active: ${serverConfig.appoptics}, bindings: ${serverConfig.bindings}`)
+  console.log(`${fs} ${fv} ${logger} (logging ${logLevel})`);
+  console.log(`active: apm ${av}, bindings: ${bv} oboe ${ov}`);
 
   console.log(`sample rate ${ao.sampleRate}, sampleMode ${ao.traceMode}`)
   console.log(dashes)

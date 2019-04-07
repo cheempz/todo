@@ -18,7 +18,7 @@ const fs = require('fs')
 
 const {shrink} = require('../lib/utility')
 
-const settings = {log: 'errors'}
+const settings = {logLevel: 'errors'}
 
 exports.config = {version}
 exports.settings = settings
@@ -30,6 +30,7 @@ exports.init = function (options) {
   const host = options.host
   const httpPort = options.httpPort
   const httpsPort = options.httpsPort
+  const traceToken = options.traceToken;
 
   //server.use(methodOverride());
 
@@ -44,10 +45,13 @@ exports.init = function (options) {
     app.use(router.routes())
   })
 
+  const logFormat = ':method :url :status :res[content-length] :trace-id - :response-time ms'
+  morgan.token('trace-id', function (req, res) {return traceToken();});
+
   // add the logger
-  const logger = morgan('dev', {
+  const logger = morgan(logFormat, {
     skip: function (req, res) {
-      if (settings.log === 'errors') {
+      if (settings.logLevel === 'errors') {
         return res.statusCode < 400 || res.statusCode === 512
       }
       return false
