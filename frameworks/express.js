@@ -58,6 +58,17 @@ exports.init = function (options) {
       }
     })
     app.use(logger)
+  } else if (loggingPackage === 'morgan-dev') {
+    const morgan = require('morgan');
+    const logger = morgan('dev', {
+      skip: function (req, res) {
+        if (settings.logLevel === 'errors') {
+          return res.statusCode < 400 || res.statusCode === 512
+        }
+        return false
+      }
+    });
+    app.use(logger);
   } else if (loggingPackage === 'pino') {
     const pino = require('express-pino-logger');
     app.use(pino());
