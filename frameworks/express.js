@@ -67,6 +67,27 @@ exports.init = function (options) {
     app.use(expressWinston.logger({
       transports: [new winston.transports.Console()]
     }));
+  } else if (loggingPackage === 'bunyan') {
+    // https://medium.com/@tobydigz/logging-in-a-node-express-app-with-morgan-and-bunyan-30d9bf2c07a
+    const bunyan = require('bunyan');
+    const logger = bunyan.createLogger({
+      name: 'bunyan-todo',
+      serializers: {
+        req: bunyan.stdSerializers.req,
+        res: bunyan.stdSerializers.res,
+      },
+      level: 'info',
+    })
+    app.use(function (req, res, next) {
+      function afterResponse () {
+        res.removeListener('finish', afterResponse);
+        res.removeListener('close', afterResponse);
+        logger.info({res});
+      }
+      res.on('finish', afterResponse);
+      res.on('close', afterResponse);
+      next();
+    })
   }
 
   // parse application / x-www-form-urlencoded
