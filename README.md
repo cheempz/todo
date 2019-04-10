@@ -11,23 +11,19 @@ To get the app running, follow the instructions below:
 	$ sudo mkdir $HOME/db ; sudo mongod --dbpath $HOME/db --port 80 --fork --logpath /var/tmp/mongodb <br/>
 - Install and run the app <br/>
 	$ git clone <git-repo-url> <br/>
-	$ cd todomvc-mongodb, npm install <br/>
-	$ node server.js --fe_ip <IP of machine running the app> --be_ip <IP of machine running mongodb> <br/>
+	$ cd todo, npm install <br/>
+	$ node server.js --ws-ip <IP of machine running the app> --db-ip <IP of machine running mongodb> <br/>
 
 Appoptics
-    server.js has been modified to add settings that make it easier to test AppOptics.
-    See the code for details but the most useful are:
+    server.js has been modified to add settings that make it easier to test AppOptics in a "real" application.
+    It can run using express (default), koa, or hapi as the web server framework. For express the logger to use can be
+    set to morgan (default), pino, winston, or bunyan. A quick overview of options can be seen by using the `-h` cli
+    option.
 
-    - `-r rate` sets the sample rate to 'rate' percent (I got tired of entering zeros)
-    - `--rate rate` sets the rate to 'rate' (0 to 1,000,000)
-    - `--fe_ip host[:port]` what the webserver listens on.
-    - `--be_ip host[:port]` where to find the mongo server
-    - the ssl port is hardcoded to 8443 at this time. it uses the `--fe_ip` host.
-    - it supports many transactions that provide insight into the server and appoptics
-
+    The server responds to many URLs in order to exercise various aspects of AppOptics. The code is the documentation.
 
 example - sample rate of 100%, serve port 8889 on localhost: <br/>
-  `$ node server -r 100 --fe_ip=localhost:8889`
+  `$ node server -r 100 --ws-ip=localhost:8889`
 
 example - check the server config: <br/>
   `$ curl localhost:8889/config`
