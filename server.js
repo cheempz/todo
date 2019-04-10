@@ -95,6 +95,11 @@ if ('trace-mode' in argv && argv.t in modeMap) {
   ao.traceMode = argv.t
 }
 
+if ('insert' in argv) {
+  ao.cfg.insertTraceIdsIntoLogs = true;
+  ao.cfg.insertTraceIdsIntoMorgan = true;
+}
+
 //
 // finally host metrics configuration
 //
