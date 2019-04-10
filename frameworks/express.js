@@ -29,13 +29,29 @@ exports.init = function (options) {
   const httpPort = options.httpPort
   const httpsPort = options.httpsPort
   const traceToken = options.traceToken;
-  const loggingPackage = options.logger;
+  let reqLogPackage = options.logger || 'morgan';
+  let reqLogFormat = 'pretty';
+  let intLogFormat = 'simple';
 
+  // make sure there are all three parts exist
+  const parts = reqLogPackage.split(':');
+  if (parts.length >= 1) {
+    reqLogPackage = parts[0];
+  }
+  if (parts.length >= 2) {
+    reqLogFormat = parts[1];
+  }
+  if (parts.length >= 3) {
+    intLogFormat = parts[2];
+  }
+
+  const format = reqLogFormat;
+  console.log(reqLogPackage, reqLogFormat, intLogFormat);
   // set up a winston logger for messages not associated with requests and responses.
   const logger = winston.createLogger({
     level: 'info',
     format: winston.format.json(),
-    transports: [new winston.transports.Console({format: winston.format.simple()})]
+    transports: [new winston.transports.Console({format: winston.format[intLogFormat]()})]
   });
 
   //server.use(methodOverride());
@@ -52,7 +68,7 @@ exports.init = function (options) {
   //
   // one of the supported logging packages
   //
-  if (!loggingPackage || loggingPackage === 'morgan') {
+  if (!reqLogPackage || reqLogPackage === 'morgan') {
     const morgan = require('morgan')
     const logFormat = ':method :url :status :res[content-length] :trace-id - :response-time ms';
     morgan.token('trace-id', function (req, res) {return traceToken();});
@@ -67,7 +83,10 @@ exports.init = function (options) {
       }
     })
     app.use(logger)
-  } else if (loggingPackage === 'morgan-dev') {
+  //
+  // morgan's builtin dev format
+  //
+  } else if (reqLogPackage === 'morgan-dev') {
     const morgan = require('morgan');
     const logger = morgan('dev', {
       skip: function (req, res) {
@@ -78,16 +97,31 @@ exports.init = function (options) {
       }
     });
     app.use(logger);
-  } else if (loggingPackage === 'pino') {
+  //
+  // pino
+  //
+  } else if (reqLogPackage === 'pino') {
     const pino = require('express-pino-logger');
     app.use(pino());
-  } else if (loggingPackage === 'winston') {
+  //
+  // winston
+  //
+  } else if (reqLogPackage === 'winston') {
     const winston = require('winston');
     const expressWinston = require('express-winston');
+    const formats = [winston.format.json()];
+    if (format === 'pretty') {
+      expressWinston.requestWhitelist = ['url', 'method', 'httpVersion', 'originalUrl', 'query'];
+      formats.push(winston.format.prettyPrint());
+    }
     app.use(expressWinston.logger({
+      format: winston.format.combine.apply(null, formats),
       transports: [new winston.transports.Console()]
     }));
-  } else if (loggingPackage === 'bunyan') {
+  //
+  // bunyan
+  //
+  } else if (reqLogPackage === 'bunyan') {
     // https://medium.com/@tobydigz/logging-in-a-node-express-app-with-morgan-and-bunyan-30d9bf2c07a
     const bunyan = require('bunyan');
     const logger = bunyan.createLogger({
@@ -175,6 +209,7 @@ exports.init = function (options) {
       return;
     }
     logger[level](req.params.string);
+    res.end();
   })
 
   //==============================================================================
