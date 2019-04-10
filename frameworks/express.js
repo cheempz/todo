@@ -18,6 +18,13 @@ const {shrink} = require('../lib/utility')
 
 const settings = {logLevel: 'errors'}
 
+const defaultFormats = {
+  morgan: {req: 'dev', int: 'simple'},
+  winston: {req: 'pretty', int: 'simple'},
+  bunyan: {req: undefined, int: undefined},
+  pino: {req: undefined, int: undefined},
+}
+
 exports.config = {version}
 exports.settings = settings
 exports.init = function (options) {
@@ -28,16 +35,21 @@ exports.init = function (options) {
   const host = options.host
   const httpPort = options.httpPort
   const httpsPort = options.httpsPort
-  const traceToken = options.traceToken;
-  let reqLogPackage = options.logger || 'morgan';
-  let reqLogFormat = 'pretty';
-  let intLogFormat = 'simple';
+  const traceToken = options.traceToken; // eslint-disable-line
+  let reqLogPackage = options.logger || 'morgan:dev';
+  let reqLogFormat;
+  let intLogFormat;
 
-  // make sure there are all three parts exist
+  // make sure there are all three parts exist.
   const parts = reqLogPackage.split(':');
-  if (parts.length >= 1) {
-    reqLogPackage = parts[0];
+  if (!parts.length) {
+    throw new TypeError('A valid logger must be specified');
   }
+  // default them.
+  reqLogPackage = parts[0];
+  reqLogFormat = defaultFormats[reqLogPackage].req;
+  intLogFormat = defaultFormats[reqLogPackage].int;
+
   if (parts.length >= 2) {
     reqLogFormat = parts[1];
   }
@@ -46,7 +58,6 @@ exports.init = function (options) {
   }
 
   const format = reqLogFormat;
-  console.log(reqLogPackage, reqLogFormat, intLogFormat);
   // set up a winston logger for messages not associated with requests and responses.
   const logger = winston.createLogger({
     level: 'info',
@@ -70,11 +81,11 @@ exports.init = function (options) {
   //
   if (!reqLogPackage || reqLogPackage === 'morgan') {
     const morgan = require('morgan')
-    const logFormat = ':method :url :status :res[content-length] :trace-id - :response-time ms';
-    morgan.token('trace-id', function (req, res) {return traceToken();});
+    //const logFormat = ':method :url :status :res[content-length] :trace-id - :response-time ms';
+    //morgan.token('trace-id', function (req, res) {return traceToken();});
 
     // add the logger
-    const logger = morgan(logFormat, {
+    const logger = morgan(reqLogFormat, {
       skip: function (req, res) {
         if (settings.logLevel === 'errors') {
           return res.statusCode < 400 || res.statusCode === 512
@@ -172,8 +183,8 @@ exports.init = function (options) {
   //==============================================================================
   const config = new Requests.Config()
 
-  app.get('/config', function getCfg (req, res) {
-    const r = config.get()
+  app.get('/config/:what', function getCfg (req, res) {
+    const r = config.get(req.params.what)
     if (r.status && r.status !== 200) {
       res.statusCode = r.status
     }
