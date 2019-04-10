@@ -61,8 +61,8 @@ exports.init = function (options) {
   // set up a winston logger for messages not associated with requests and responses.
   const logger = winston.createLogger({
     level: 'info',
-    format: winston.format.json(),
-    transports: [new winston.transports.Console({format: winston.format[intLogFormat]()})]
+    format: winston.format.combine(winston.format.colorize(), winston.format[intLogFormat]()),
+    transports: [new winston.transports.Console()],
   });
 
   //server.use(methodOverride());
