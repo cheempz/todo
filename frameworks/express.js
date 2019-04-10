@@ -5,6 +5,8 @@ const Express = require('express')
 const version = require('express/package.json').version
 const bodyParser = require('body-parser')
 
+const winston = require('winston');
+
 const app = new Express()
 
 const http = require('http')
@@ -28,6 +30,13 @@ exports.init = function (options) {
   const httpsPort = options.httpsPort
   const traceToken = options.traceToken;
   const loggingPackage = options.logger;
+
+  // set up a winston logger for messages not associated with requests and responses.
+  const logger = winston.createLogger({
+    level: 'info',
+    format: winston.format.json(),
+    transports: [new winston.transports.Console({format: winston.format.simple()})]
+  });
 
   //server.use(methodOverride());
 
@@ -156,6 +165,16 @@ exports.init = function (options) {
     }
     r.framework = 'express'
     res.json(r)
+  })
+
+  app.get('/log/:level/:string', function doLog (req, res) {
+    const level = req.params.level;
+    if (level !== 'error' && level !== 'warn' && level !== 'info') {
+      res.statusCode = 404;
+      res.end();
+      return;
+    }
+    logger[level](req.params.string);
   })
 
   //==============================================================================
@@ -392,14 +411,18 @@ exports.init = function (options) {
   //
   // now make a chained URL
   //
+  // curl -i localhost:8088/chain?target=http://localhost:8088/chain?target=...
+  //
   app.get('/chain', function chain (req, res) {
 
     const q = req.query.target
 
     if (!q) {
+      logger.info('this is the end of the chain');
       res.send('this is the end!\n')
       return
     }
+    logger.info(`chain about to fetch ${q}`);
 
     const options = url.parse(q)
     if (req.headers['X-Trace']) {
@@ -417,9 +440,10 @@ exports.init = function (options) {
         const p = makePrefix(q)
         const h = JSON.stringify(ires.headers)
         res.send(p + h + '\nbody: ' + body + '\n')
+        logger.info('chain sent body');
       })
       ires.on('error', function (e) {
-        console.log('GOT ERROR', e)
+        logger.error('chain got an error', e);
       })
     })
 
@@ -439,10 +463,18 @@ exports.init = function (options) {
   // http.request()
   //
   app.get('/chain2', function chain2 (req, res) {
+    const q = req.query.target
+
+    if (!q) {
+      logger.info('this is the end of the chain2');
+      res.send('this is the end!\n')
+      return
+    }
+    logger.info(`chain2 about to fetch ${q}`);
 
     const request = require('request')
     const options = {
-      url: url.parse(req.query.target),
+      url: url.parse(q),
       headers: {
         'user-agent': 'request'
       }
@@ -452,6 +484,7 @@ exports.init = function (options) {
         const p = makePrefix(req.query.target)
         const h = JSON.stringify(response.headers)
         res.send(p + h + '\nbody: ' + body + '\n')
+        logger.info('chain2 sent body')
       }
     }
 
