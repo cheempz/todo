@@ -8,7 +8,9 @@ module.exports = {
   hostnameAlias: '',
   domainPrefix: false,
   serviceKey: `${key}:ao-node-${version}`,
-  insertTraceIdsIntoLogs: 'traced',
+  insertTraceIdsIntoLogs: undefined,
+  insertTraceIdsIntoMorgan: undefined,
+  createTraceIdsToken: undefined,
   probes: {
     fs: {
       enabled: true
