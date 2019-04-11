@@ -14,15 +14,19 @@ const url = require('url')
 const path = require('path')
 const fs = require('fs')
 
-const {shrink} = require('../lib/utility')
+const {shrink, getLogOptions} = require('../lib/utility')
 
 const settings = {logLevel: 'errors'}
 
+//
+// the int (internal) value is for winston as it is the only internal logger
+// currently implemented.
+//
 const defaultFormats = {
   morgan: {req: 'dev', int: 'simple'},
   winston: {req: 'pretty', int: 'simple'},
-  bunyan: {req: undefined, int: undefined},
-  pino: {req: undefined, int: undefined},
+  bunyan: {req: undefined, int: 'simple'},
+  pino: {req: undefined, int: 'simple'},
 }
 
 exports.config = {version}
@@ -36,26 +40,9 @@ exports.init = function (options) {
   const httpPort = options.httpPort
   const httpsPort = options.httpsPort
   const traceToken = options.traceToken; // eslint-disable-line
-  let reqLogPackage = options.logger || 'morgan:dev';
-  let reqLogFormat;
-  let intLogFormat;
+  const logOpts = options.logger || 'morgan:dev';
 
-  // make sure there are all three parts exist.
-  const parts = reqLogPackage.split(':');
-  if (!parts.length) {
-    throw new TypeError('A valid logger must be specified');
-  }
-  // default them.
-  reqLogPackage = parts[0];
-  reqLogFormat = defaultFormats[reqLogPackage].req;
-  intLogFormat = defaultFormats[reqLogPackage].int;
-
-  if (parts.length >= 2) {
-    reqLogFormat = parts[1];
-  }
-  if (parts.length >= 3) {
-    intLogFormat = parts[2];
-  }
+  const {reqLogger, reqLogFormat, intLogFormat} = getLogOptions(logOpts, defaultFormats);
 
   const format = reqLogFormat;
   // set up a winston logger for messages not associated with requests and responses.
@@ -79,7 +66,7 @@ exports.init = function (options) {
   //
   // one of the supported logging packages
   //
-  if (!reqLogPackage || reqLogPackage === 'morgan') {
+  if (!reqLogger || reqLogger === 'morgan') {
     const morgan = require('morgan')
     //const logFormat = ':method :url :status :res[content-length] :trace-id - :response-time ms';
     //morgan.token('trace-id', function (req, res) {return traceToken();});
@@ -97,7 +84,7 @@ exports.init = function (options) {
   //
   // morgan's builtin dev format
   //
-  } else if (reqLogPackage === 'morgan-dev') {
+  } else if (reqLogger === 'morgan-dev') {
     const morgan = require('morgan');
     const logger = morgan('dev', {
       skip: function (req, res) {
@@ -111,13 +98,13 @@ exports.init = function (options) {
   //
   // pino
   //
-  } else if (reqLogPackage === 'pino') {
+  } else if (reqLogger === 'pino') {
     const pino = require('express-pino-logger');
     app.use(pino());
   //
   // winston
   //
-  } else if (reqLogPackage === 'winston') {
+  } else if (reqLogger === 'winston') {
     const winston = require('winston');
     const expressWinston = require('express-winston');
     const formats = [winston.format.json()];
@@ -132,7 +119,7 @@ exports.init = function (options) {
   //
   // bunyan
   //
-  } else if (reqLogPackage === 'bunyan') {
+  } else if (reqLogger === 'bunyan') {
     // https://medium.com/@tobydigz/logging-in-a-node-express-app-with-morgan-and-bunyan-30d9bf2c07a
     const bunyan = require('bunyan');
     const logger = bunyan.createLogger({
@@ -183,7 +170,7 @@ exports.init = function (options) {
   //==============================================================================
   const config = new Requests.Config()
 
-  app.get('/config/:what', function getCfg (req, res) {
+  app.get('/config/:what?', function getCfg (req, res) {
     const r = config.get(req.params.what)
     if (r.status && r.status !== 200) {
       res.statusCode = r.status
