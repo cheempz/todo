@@ -13,6 +13,10 @@ elif [ -z "$AO_TOKEN_STG" ]; then
     return
 fi
 
+if [[ -z "$APPOPTICS_LOG_SETTINGS" ]]; then
+    export APPOPTICS_LOG_SETTINGS=error,warn,patching,debug
+fi
+
 # define this for all options
 export APPOPTICS_SERVICE_KEY=${token}:${AO_SERVICE_NAME:-node-todo-test}
 echo Defined service as $APPOPTICS_SERVICE_KEY
