@@ -8,6 +8,7 @@ const StaticKoaRouter = require('static-koa-router')
 const morgan = require('koa-morgan')
 const bodyParser = require('koa-bodyparser')
 const koaSend = require('koa-send')
+const winston = require('winston');
 
 const app = new Koa()
 
@@ -16,9 +17,16 @@ const url = require('url')
 const path = require('path')
 const fs = require('fs')
 
-const {shrink} = require('../lib/utility')
+const {shrink, getLogOptions} = require('../lib/utility')
 
 const settings = {logLevel: 'errors'}
+
+const defaultFormats = {
+  morgan: {req: 'dev', int: 'simple'},
+  winston: {req: 'pretty', int: 'simple'},
+  bunyan: {req: undefined, int: undefined},
+  pino: {req: undefined, int: undefined},
+}
 
 exports.config = {version}
 exports.settings = settings
@@ -31,6 +39,22 @@ exports.init = function (options) {
   const httpPort = options.httpPort
   const httpsPort = options.httpsPort
   const traceToken = options.traceToken;
+  const logOpts = options.logger || 'morgan:dev:simple';
+
+  // get the logger and formats
+  const {reqLogger, reqLogFormat, intLogFormat} = getLogOptions(logOpts, defaultFormats);
+
+  // create the internal (not request) logger
+  const logger = winston.createLogger({
+    level: 'info',
+    format: winston.format.combine(winston.format.colorize(), winston.format[intLogFormat]()),
+    transports: [new winston.transports.Console()]
+  });
+
+  // consider allowing a custom format to be used that manually inserts the traceId.
+  //const logFormat = ':method :url :status :res[content-length] :trace-id - :response-time ms'
+  //morgan.token('trace-id', function (req, res) {return traceToken();});
+  traceToken;  // get rid of eslint error for now.
 
   //server.use(methodOverride());
 
@@ -45,19 +69,23 @@ exports.init = function (options) {
     app.use(router.routes())
   })
 
-  const logFormat = ':method :url :status :res[content-length] :trace-id - :response-time ms'
-  morgan.token('trace-id', function (req, res) {return traceToken();});
-
-  // add the logger
-  const logger = morgan(logFormat, {
-    skip: function (req, res) {
-      if (settings.logLevel === 'errors') {
-        return res.statusCode < 400 || res.statusCode === 512
+  //
+  // set up the request logger
+  //
+  if (reqLogger === 'morgan') {
+    // add the request logger
+    const logger = morgan(reqLogFormat, {
+      skip: function (req, res) {
+        if (settings.logLevel === 'errors') {
+          return res.statusCode < 400 || res.statusCode === 512
+        }
+        return false
       }
-      return false
-    }
-  })
-  app.use(logger)
+    })
+    app.use(logger)
+  } else {
+    throw new TypeError(`koa does not support the ${reqLogger} logger`);
+  }
 
   // [json, form] are defaults so no need to set them up
   // parse application / x-www-form-urlencoded
@@ -119,6 +147,15 @@ exports.init = function (options) {
     ctx.body = r
   })
 
+  router.get('/log/:level/:string', async function doLog (ctx) {
+    const level = ctx.params.level;
+    if (!logger[level]) {
+      ctx.status = 404;
+      return;
+    }
+    logger[level](ctx.params.string);
+    ctx.body = {status: 'logged'};
+  })
 
   //==============================================================================
   // the todo api ================================================================
@@ -421,6 +458,21 @@ exports.init = function (options) {
       request(options, callback)
     })
   })
+
+  //==========================================================================
+  // aws kinesis =============================================================
+  //==========================================================================
+  const awsKinesis = new Requests.AwsKinesis()
+
+  router.post('/aws/kinesis', async function kinesis (ctx, next) {
+    const p = awsKinesis.put();
+    p.then().catch(e => {
+      const {message, code, time, requestId, statusCode, retryable, retryDelay} = e;
+      logger.error({message, code, time, requestId, statusCode, retryable, retryDelay});
+    })
+    ctx.body = {status: 'received'};
+  })
+
 
   //==========================================================================
   // application =============================================================
